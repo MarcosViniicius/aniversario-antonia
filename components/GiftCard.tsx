@@ -1,15 +1,15 @@
 'use client'
 
-import { Sparkles, Home, ShoppingBag, ChefHat, Gem, Banknote, Lock, CheckCircle2 } from 'lucide-react'
+import { Sparkles, Home, ShoppingBag, ChefHat, Gem, Banknote, Lock, CheckCircle2, Users } from 'lucide-react'
 import { type Gift, categoryConfig, type GiftCategory } from '@/lib/gifts-data'
 
 const categoryIcons: Record<GiftCategory, React.ElementType> = {
-  beleza:    Sparkles,
-  casa:      Home,
-  calcados:  ShoppingBag,
-  cozinha:   ChefHat,
+  beleza:     Sparkles,
+  casa:       Home,
+  calcados:   ShoppingBag,
+  cozinha:    ChefHat,
   acessorios: Gem,
-  pix:       Banknote,
+  pix:        Banknote,
 }
 
 interface ClaimRecord {
@@ -19,29 +19,36 @@ interface ClaimRecord {
 
 interface Props {
   gift: Gift
-  claim?: ClaimRecord
-  isMyGift: boolean
-  hasUserClaimed: boolean
+  claims: ClaimRecord[]   // array of claimants for this gift
+  isMyGift: boolean       // current user has claimed this gift
+  hasUserClaimed: boolean // current user has claimed ANY gift
   onClick: () => void
 }
 
-export default function GiftCard({ gift, claim, isMyGift, hasUserClaimed, onClick }: Props) {
-  const cfg = categoryConfig[gift.category]
+export default function GiftCard({ gift, claims, isMyGift, hasUserClaimed, onClick }: Props) {
+  const cfg  = categoryConfig[gift.category]
   const Icon = categoryIcons[gift.category]
-  const isClaimed = !!claim
-  const canClick = !isClaimed && !hasUserClaimed
 
-  const borderColor = isMyGift
-    ? '#4CAF9A'
-    : isClaimed
-    ? '#E5D5CF'
+  const isUnlimited = gift.limit === null
+  const isFull      = !isUnlimited && claims.length >= (gift.limit ?? 1)
+  const canClick    = !isFull && !hasUserClaimed
+
+  // Visual state
+  const borderColor = isMyGift  ? '#4CAF9A'
+    : isFull        ? '#E5D5CF'
     : cfg.borderColor
 
-  const bgColor = isMyGift
-    ? '#EDF7F5'
-    : isClaimed
-    ? '#F8F5F3'
+  const bgColor = isMyGift ? '#EDF7F5'
+    : isFull     ? '#F8F5F3'
     : 'white'
+
+  const ariaLabel = isMyGift
+    ? `Seu presente: ${gift.name}`
+    : isFull
+    ? `${gift.name} — já escolhido por ${claims[0]?.claimedBy}`
+    : isUnlimited
+    ? `${gift.name} — contribuição, ${claims.length} pessoa(s) já contribuindo`
+    : `${gift.name} — disponível, clique para escolher`
 
   return (
     <div
@@ -49,30 +56,25 @@ export default function GiftCard({ gift, claim, isMyGift, hasUserClaimed, onClic
       tabIndex={canClick ? 0 : undefined}
       onClick={canClick ? onClick : undefined}
       onKeyDown={canClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') onClick() } : undefined}
-      aria-label={
-        isMyGift
-          ? `Seu presente: ${gift.name}`
-          : isClaimed
-          ? `${gift.name} — escolhido por ${claim!.claimedBy}`
-          : `${gift.name} — disponível, clique para escolher`
-      }
+      aria-label={ariaLabel}
       className="relative rounded-2xl p-4 border-2 flex flex-col gap-2 select-none"
       style={{
         backgroundColor: bgColor,
         borderColor,
-        cursor: canClick ? 'pointer' : 'default',
-        opacity: isClaimed && !isMyGift ? 0.72 : 1,
-        transition: 'transform 150ms ease, box-shadow 150ms ease, border-color 150ms ease',
-        boxShadow: canClick ? undefined : 'none',
+        cursor:    canClick ? 'pointer' : 'default',
+        opacity:   isFull && !isMyGift ? 0.68 : 1,
+        transition: 'transform 150ms ease, box-shadow 150ms ease',
       }}
       onMouseEnter={(e) => {
         if (!canClick) return
-        ;(e.currentTarget as HTMLDivElement).style.transform = 'translateY(-2px)'
-        ;(e.currentTarget as HTMLDivElement).style.boxShadow = '0 6px 20px rgba(201,132,107,0.18)'
+        const el = e.currentTarget as HTMLDivElement
+        el.style.transform  = 'translateY(-2px)'
+        el.style.boxShadow  = '0 6px 20px rgba(201,132,107,0.18)'
       }}
       onMouseLeave={(e) => {
-        ;(e.currentTarget as HTMLDivElement).style.transform = ''
-        ;(e.currentTarget as HTMLDivElement).style.boxShadow = ''
+        const el = e.currentTarget as HTMLDivElement
+        el.style.transform = ''
+        el.style.boxShadow = ''
       }}
       onMouseDown={(e) => {
         if (!canClick) return
@@ -83,7 +85,7 @@ export default function GiftCard({ gift, claim, isMyGift, hasUserClaimed, onClic
         ;(e.currentTarget as HTMLDivElement).style.transform = 'translateY(-2px)'
       }}
     >
-      {/* Header row */}
+      {/* Category row */}
       <div className="flex items-center gap-2">
         <div
           className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0"
@@ -101,20 +103,28 @@ export default function GiftCard({ gift, claim, isMyGift, hasUserClaimed, onClic
             className="ml-auto text-xs font-bold px-2 py-0.5 rounded-full"
             style={{ backgroundColor: '#4CAF9A', color: 'white' }}
           >
-            Seu presente
+            {isUnlimited ? 'Você contribui' : 'Seu presente'}
           </span>
         )}
-        {isClaimed && !isMyGift && (
+        {isFull && !isMyGift && (
           <span className="ml-auto">
             <Lock size={13} style={{ color: '#C0A898' }} />
           </span>
         )}
+        {isUnlimited && !isMyGift && claims.length > 0 && (
+          <div className="ml-auto flex items-center gap-1">
+            <Users size={12} style={{ color: cfg.color }} />
+            <span className="text-xs font-semibold" style={{ color: cfg.color }}>
+              {claims.length}
+            </span>
+          </div>
+        )}
       </div>
 
-      {/* Name */}
+      {/* Gift name */}
       <p
         className="text-sm font-semibold leading-snug"
-        style={{ color: isClaimed && !isMyGift ? '#A08070' : '#3D2B1F' }}
+        style={{ color: isFull && !isMyGift ? '#A08070' : '#3D2B1F' }}
       >
         {gift.name}
       </p>
@@ -127,14 +137,37 @@ export default function GiftCard({ gift, claim, isMyGift, hasUserClaimed, onClic
       )}
 
       {/* Footer */}
-      {isClaimed ? (
+      {isUnlimited ? (
+        // PIX footer
+        <div className="mt-auto">
+          {isMyGift ? (
+            <div className="flex items-center gap-1.5">
+              <CheckCircle2 size={12} style={{ color: '#4CAF9A' }} />
+              <span className="text-xs" style={{ color: '#2D8070' }}>
+                {claims.find(c => c.claimedBy)?.claimedBy ?? ''} está contribuindo
+              </span>
+            </div>
+          ) : !hasUserClaimed ? (
+            <span
+              className="inline-block text-xs font-semibold px-3 py-1 rounded-full"
+              style={{ backgroundColor: cfg.bgColor, color: cfg.color }}
+            >
+              {claims.length === 0
+                ? 'Seja o primeiro a contribuir'
+                : `${claims.length} contribuindo — participe também`}
+            </span>
+          ) : null}
+        </div>
+      ) : isFull ? (
+        // Regular gift — claimed
         <div className="flex items-center gap-1.5 mt-auto">
           <CheckCircle2 size={12} style={{ color: isMyGift ? '#4CAF9A' : '#C0A898' }} />
           <span className="text-xs" style={{ color: isMyGift ? '#2D8070' : '#A08070' }}>
-            {claim!.claimedBy}
+            {claims[0]?.claimedBy}
           </span>
         </div>
       ) : (
+        // Regular gift — available
         !hasUserClaimed && (
           <div className="mt-auto">
             <span

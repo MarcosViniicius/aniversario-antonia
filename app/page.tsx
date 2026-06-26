@@ -13,31 +13,35 @@ interface ClaimRecord {
   claimedAt: string
 }
 
-type Claims = Record<string, ClaimRecord>
+// Each gift maps to an array of claimants (1 for regular, N for PIX)
+type Claims = Record<string, ClaimRecord[]>
 
 type Filter = GiftCategory | 'todos'
 
 const FILTER_OPTIONS: { value: Filter; label: string }[] = [
-  { value: 'todos',     label: 'Todos'        },
-  { value: 'beleza',    label: 'Beleza'       },
-  { value: 'casa',      label: 'Casa'         },
-  { value: 'cozinha',   label: 'Cozinha'      },
-  { value: 'calcados',  label: 'Calçados'     },
-  { value: 'acessorios',label: 'Acessórios'   },
-  { value: 'pix',       label: 'Contribuição' },
+  { value: 'todos',      label: 'Todos'        },
+  { value: 'beleza',     label: 'Beleza'       },
+  { value: 'casa',       label: 'Casa'         },
+  { value: 'cozinha',    label: 'Cozinha'      },
+  { value: 'calcados',   label: 'Calçados'     },
+  { value: 'acessorios', label: 'Acessórios'   },
+  { value: 'pix',        label: 'Contribuição' },
 ]
 
+// Regular gifts (limit: 1) — used for progress bar
+const regularGifts = gifts.filter(g => g.limit !== null)
+
 export default function Home() {
-  const [claims,        setClaims]        = useState<Claims>({})
-  const [loading,       setLoading]       = useState(true)
-  const [refreshing,    setRefreshing]    = useState(false)
-  const [selectedId,    setSelectedId]    = useState<number | null>(null)
-  const [userClaim,     setUserClaim]     = useState<UserClaim | null>(null)
-  const [toasts,        setToasts]        = useState<Toast[]>([])
-  const [filter,        setFilter]        = useState<Filter>('todos')
+  const [claims,     setClaims]     = useState<Claims>({})
+  const [loading,    setLoading]    = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
+  const [selectedId, setSelectedId] = useState<number | null>(null)
+  const [userClaim,  setUserClaim]  = useState<UserClaim | null>(null)
+  const [toasts,     setToasts]     = useState<Toast[]>([])
+  const [filter,     setFilter]     = useState<Filter>('todos')
   const pollRef = useRef<ReturnType<typeof setInterval>>()
 
-  // ── Toast helpers ────────────────────────────────────────────────────────────
+  // ── Toasts ───────────────────────────────────────────────────────────────────
   const addToast = useCallback((type: Toast['type'], message: string) => {
     const id = Date.now().toString(36) + Math.random().toString(36).slice(2)
     setToasts(prev => [...prev, { id, type, message }])
@@ -48,18 +52,14 @@ export default function Home() {
     setToasts(prev => prev.filter(t => t.id !== id))
   }, [])
 
-  // ── Fetch claims from server ─────────────────────────────────────────────────
+  // ── Fetch ────────────────────────────────────────────────────────────────────
   const fetchClaims = useCallback(async (showSpinner = false) => {
     if (showSpinner) setRefreshing(true)
     try {
       const res = await fetch('/api/gifts', { cache: 'no-store' })
-      if (res.ok) {
-        const data: Claims = await res.json()
-        setClaims(data)
-      }
-    } catch {
-      // silent — keep current state
-    } finally {
+      if (res.ok) setClaims(await res.json() as Claims)
+    } catch { /* keep current state */ }
+    finally {
       setLoading(false)
       if (showSpinner) setTimeout(() => setRefreshing(false), 600)
     }
@@ -72,42 +72,49 @@ export default function Home() {
     return () => clearInterval(pollRef.current)
   }, [fetchClaims])
 
-  // ── Claim a gift ─────────────────────────────────────────────────────────────
+  // ── Claim ────────────────────────────────────────────────────────────────────
   const handleClaim = useCallback(async (giftId: number, userName: string) => {
     const gift = gifts.find(g => g.id === giftId)
     if (!gift) return
 
-    const now = new Date().toISOString()
-    const newRecord: ClaimRecord = { claimedBy: userName, claimedAt: now }
+    const now    = new Date().toISOString()
+    const record: ClaimRecord = { claimedBy: userName, claimedAt: now }
+    const key    = String(giftId)
 
-    // Optimistic update + localStorage (redundancy)
-    setClaims(prev => ({ ...prev, [giftId]: newRecord }))
-    const localClaim: UserClaim = { giftId, giftName: gift.name, userName, claimedAt: now }
-    saveUserClaim(localClaim)
-    setUserClaim(localClaim)
+    // Optimistic update
+    setClaims(prev => ({
+      ...prev,
+      [key]: [...(prev[key] ?? []), record],
+    }))
+
+    // Persist to localStorage immediately (redundancy)
+    const local: UserClaim = { giftId, giftName: gift.name, userName, claimedAt: now }
+    saveUserClaim(local)
+    setUserClaim(local)
     setSelectedId(null)
 
     try {
       const res = await fetch('/api/gifts', {
-        method: 'POST',
+        method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ giftId, claimedBy: userName }),
+        body:    JSON.stringify({ giftId, claimedBy: userName }),
       })
 
       if (res.ok) {
-        addToast('success', `Ótimo, ${userName}! Você escolheu: ${gift.name}`)
+        addToast('success', `Ótimo, ${userName}! "${gift.name}" reservado com sucesso.`)
       } else if (res.status === 409) {
-        // Conflict — someone grabbed it simultaneously
-        setClaims(prev => { const c = { ...prev }; delete c[giftId]; return c })
+        // Rollback
+        setClaims(prev => ({
+          ...prev,
+          [key]: (prev[key] ?? []).filter(c => c.claimedBy !== userName),
+        }))
         clearUserClaim()
         setUserClaim(null)
-        addToast('error', 'Esse presente acabou de ser escolhido por outra pessoa. Escolha outro!')
+        addToast('error', 'Esse presente acabou de ser escolhido por outra pessoa. Tente outro!')
         fetchClaims()
-      } else {
-        throw new Error('server error')
       }
     } catch {
-      addToast('info', 'Problema ao conectar. Sua escolha está salva localmente e será confirmada em breve.')
+      addToast('info', 'Problema na conexão. Sua escolha está salva localmente e será confirmada em breve.')
       fetchClaims()
     }
   }, [addToast, fetchClaims])
@@ -115,62 +122,70 @@ export default function Home() {
   // ── Unclaim ──────────────────────────────────────────────────────────────────
   const handleUnclaim = useCallback(async () => {
     if (!userClaim) return
-    const { giftId } = userClaim
+    const { giftId, userName } = userClaim
+    const key = String(giftId)
 
-    setClaims(prev => { const c = { ...prev }; delete c[giftId]; return c })
+    setClaims(prev => ({
+      ...prev,
+      [key]: (prev[key] ?? []).filter(c => c.claimedBy !== userName),
+    }))
     clearUserClaim()
     setUserClaim(null)
 
     try {
       await fetch('/api/gifts', {
-        method: 'DELETE',
+        method:  'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ giftId }),
+        body:    JSON.stringify({ giftId, claimedBy: userName }),
       })
       addToast('info', 'Presente liberado. Você pode escolher outro!')
     } catch {
-      addToast('error', 'Erro ao liberar o presente. Tente novamente.')
+      addToast('error', 'Erro ao liberar. Tente novamente.')
       fetchClaims()
     }
   }, [userClaim, addToast, fetchClaims])
 
-  // ── Click on a card ──────────────────────────────────────────────────────────
+  // ── Card click ───────────────────────────────────────────────────────────────
   const handleCardClick = useCallback((gift: GiftType) => {
-    if (claims[gift.id]) return
+    const key      = String(gift.id)
+    const claimArr = claims[key] ?? []
+    const isFull   = gift.limit !== null && claimArr.length >= gift.limit
+
+    if (isFull) return
+
+    // If user already claimed this exact gift, do nothing
+    if (userClaim?.giftId === gift.id) return
+
+    // If user has a claim and this is a different gift, block
     if (userClaim) {
-      addToast('info', `Você já escolheu: ${userClaim.giftName}. Para mudar, clique em "Mudar".`)
+      addToast('info', `Você já escolheu: "${userClaim.giftName}". Clique em "Mudar" para trocar.`)
       return
     }
+
     setSelectedId(gift.id)
   }, [claims, userClaim, addToast])
 
-  // ── Derived state ────────────────────────────────────────────────────────────
-  const selectedGift   = gifts.find(g => g.id === selectedId)
-  const claimedCount   = Object.keys(claims).length
-  const totalCount     = gifts.length
-  const progressPct    = loading ? 0 : Math.round((claimedCount / totalCount) * 100)
-  const filteredGifts  = filter === 'todos' ? gifts : gifts.filter(g => g.category === filter)
+  // ── Derived ──────────────────────────────────────────────────────────────────
+  const selectedGift     = gifts.find(g => g.id === selectedId)
+  const claimedRegular   = regularGifts.filter(g => (claims[String(g.id)] ?? []).length > 0).length
+  const totalRegular     = regularGifts.length
+  const pixContributors  = (claims['16'] ?? []).length
+  const progressPct      = loading ? 0 : Math.round((claimedRegular / totalRegular) * 100)
+  const filteredGifts    = filter === 'todos' ? gifts : gifts.filter(g => g.category === filter)
 
   return (
     <main className="min-h-screen" style={{ backgroundColor: '#FDF8F3' }}>
 
       {/* ── HERO ─────────────────────────────────────────────────────────────── */}
       <header>
-        <div
-          style={{
-            background: 'linear-gradient(180deg, #F2E0D8 0%, #FBF0EA 55%, #FDF8F3 100%)',
-            position: 'relative',
-            overflow: 'hidden',
-          }}
-        >
-          {/* Radial corner glows */}
-          <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
+        <div style={{ background: 'linear-gradient(180deg, #F2E0D8 0%, #FBF0EA 55%, #FDF8F3 100%)', position: 'relative', overflow: 'hidden' }}>
+          {/* Corner glows */}
+          <div aria-hidden="true" style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
             <div style={{ position: 'absolute', top: -40, left: -40, width: 200, height: 200, borderRadius: '50%', background: 'radial-gradient(circle, rgba(201,168,76,0.18) 0%, transparent 70%)' }} />
             <div style={{ position: 'absolute', top: -40, right: -40, width: 200, height: 200, borderRadius: '50%', background: 'radial-gradient(circle, rgba(201,168,76,0.18) 0%, transparent 70%)' }} />
-            <div style={{ position: 'absolute', bottom: -20, left: '50%', transform: 'translateX(-50%)', width: 300, height: 120, borderRadius: '50%', background: 'radial-gradient(ellipse, rgba(201,132,107,0.1) 0%, transparent 70%)' }} />
           </div>
 
-          <div className="relative max-w-xl mx-auto px-6 pt-10 pb-8 text-center">
+          <div className="relative max-w-2xl mx-auto px-6 pt-10 pb-8 text-center">
             {/* Top ornament */}
             <div className="flex items-center justify-center gap-3 mb-5">
               <div style={{ height: 1, width: 56, background: 'linear-gradient(to right, transparent, #C9A84C)' }} />
@@ -182,41 +197,27 @@ export default function Home() {
               Você é nosso convidado especial
             </p>
 
-            {/* 80 */}
-            <div className="mb-0">
-              <span
-                className="font-playfair font-bold leading-none"
-                style={{
-                  fontSize: 'clamp(72px, 18vw, 100px)',
-                  color: '#C9A84C',
-                  textShadow: '0 3px 12px rgba(201,168,76,0.25)',
-                  display: 'inline-block',
-                }}
-              >
+            <div>
+              <span className="font-playfair font-bold leading-none" style={{ fontSize: 'clamp(72px,18vw,100px)', color: '#C9A84C', textShadow: '0 3px 12px rgba(201,168,76,0.25)', display: 'inline-block' }}>
                 80
               </span>
-              <span
-                className="font-playfair italic ml-2"
-                style={{ fontSize: 'clamp(20px, 5vw, 28px)', color: '#C9846B' }}
-              >
+              <span className="font-playfair italic ml-2" style={{ fontSize: 'clamp(20px,5vw,28px)', color: '#C9846B' }}>
                 anos
               </span>
             </div>
 
             <p className="font-playfair text-base italic mb-2" style={{ color: '#B08070' }}>de</p>
 
-            <h1 className="font-playfair font-bold mb-6" style={{ fontSize: 'clamp(28px, 8vw, 44px)', color: '#3D2B1F' }}>
+            <h1 className="font-playfair font-bold mb-6" style={{ fontSize: 'clamp(28px,8vw,44px)', color: '#3D2B1F' }}>
               Antônia Lucena
             </h1>
 
-            {/* Divider */}
             <div className="flex items-center justify-center gap-4 mb-5">
               <div style={{ height: 1, width: 40, backgroundColor: '#E8C8BA' }} />
               <Gift size={15} style={{ color: '#C9846B' }} />
               <div style={{ height: 1, width: 40, backgroundColor: '#E8C8BA' }} />
             </div>
 
-            {/* Event details */}
             <div className="flex flex-wrap justify-center gap-x-5 gap-y-2 mb-4 text-sm">
               {([
                 { Icon: Calendar, text: '16 de Agosto de 2026' },
@@ -231,14 +232,12 @@ export default function Home() {
             </div>
 
             <p className="text-xs leading-relaxed" style={{ color: '#B08070' }}>
-              Venha celebrar conosco este momento tão especial!
-              <br />
+              Venha celebrar conosco este momento tão especial!{' '}
               <span className="font-semibold" style={{ color: '#8B5A44' }}>
                 Confirme sua presença até 20 de julho de 2026.
               </span>
             </p>
 
-            {/* Bottom ornament */}
             <div className="flex items-center justify-center gap-3 mt-6">
               <div style={{ height: 1, width: 56, background: 'linear-gradient(to right, transparent, #C9A84C)' }} />
               <span style={{ color: '#C9A84C', fontSize: 18, lineHeight: 1 }}>✦</span>
@@ -247,33 +246,32 @@ export default function Home() {
           </div>
         </div>
 
-        {/* ── Progress bar strip ─────────────────────────────────────────────── */}
-        <div
-          className="border-b"
-          style={{ backgroundColor: 'white', borderColor: '#F0E4DE' }}
-        >
-          <div className="max-w-xl mx-auto px-4 py-3">
-            <div className="flex justify-between items-center mb-1.5">
-              <p className="text-xs font-semibold" style={{ color: '#3D2B1F' }}>
-                {loading
-                  ? 'Carregando presentes...'
-                  : claimedCount === totalCount
-                  ? 'Todos os presentes foram escolhidos!'
-                  : `${claimedCount} de ${totalCount} presentes escolhidos`}
-              </p>
+        {/* Progress strip */}
+        <div className="border-b" style={{ backgroundColor: 'white', borderColor: '#F0E4DE' }}>
+          <div className="max-w-4xl mx-auto px-4 py-3">
+            <div className="flex flex-wrap justify-between items-center gap-2 mb-1.5">
+              <div>
+                <p className="text-xs font-semibold" style={{ color: '#3D2B1F' }}>
+                  {loading
+                    ? 'Carregando...'
+                    : claimedRegular === totalRegular
+                    ? 'Todos os presentes foram escolhidos!'
+                    : `${claimedRegular} de ${totalRegular} presentes escolhidos`}
+                </p>
+                {!loading && pixContributors > 0 && (
+                  <p className="text-xs" style={{ color: '#4CAF9A' }}>
+                    {pixContributors} pessoa{pixContributors > 1 ? 's' : ''} contribuindo com Pix
+                  </p>
+                )}
+              </div>
               <button
                 onClick={() => fetchClaims(true)}
                 disabled={refreshing}
                 className="flex items-center gap-1 text-xs px-2 py-1 rounded-lg transition-opacity hover:opacity-70"
                 style={{ color: '#B08070' }}
-                title="Atualizar lista"
-                aria-label="Atualizar lista de presentes"
+                aria-label="Atualizar lista"
               >
-                <RefreshCw
-                  size={13}
-                  style={{ transition: 'transform 600ms ease' }}
-                  className={refreshing ? 'animate-spin' : ''}
-                />
+                <RefreshCw size={13} className={refreshing ? 'animate-spin' : ''} />
                 <span>Atualizar</span>
               </button>
             </div>
@@ -292,7 +290,7 @@ export default function Home() {
       </header>
 
       {/* ── BODY ─────────────────────────────────────────────────────────────── */}
-      <div className="max-w-xl mx-auto px-4 py-6">
+      <div className="max-w-4xl mx-auto px-4 py-6">
 
         {/* My choice banner */}
         {userClaim && !loading && (
@@ -312,11 +310,7 @@ export default function Home() {
             <button
               onClick={handleUnclaim}
               className="flex-shrink-0 text-xs px-3 py-1.5 rounded-lg font-semibold transition-colors hover:bg-white"
-              style={{
-                color: '#4CAF9A',
-                border: '1.5px solid #A8DDD5',
-                backgroundColor: 'rgba(255,255,255,0.7)',
-              }}
+              style={{ color: '#4CAF9A', border: '1.5px solid #A8DDD5', backgroundColor: 'rgba(255,255,255,0.7)' }}
             >
               Mudar
             </button>
@@ -339,7 +333,7 @@ export default function Home() {
         <div className="flex gap-2 overflow-x-auto pb-2 mb-5 scrollbar-hide">
           {FILTER_OPTIONS.map(opt => {
             const active = filter === opt.value
-            const cfg = opt.value !== 'todos' ? categoryConfig[opt.value as GiftCategory] : null
+            const cfg    = opt.value !== 'todos' ? categoryConfig[opt.value as GiftCategory] : null
             return (
               <button
                 key={opt.value}
@@ -358,10 +352,10 @@ export default function Home() {
           })}
         </div>
 
-        {/* Gift grid */}
+        {/* Gift grid — 1 col mobile · 2 cols tablet · 3 cols desktop */}
         {loading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {Array.from({ length: 8 }).map((_, i) => (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {Array.from({ length: 9 }).map((_, i) => (
               <div key={i} className="skeleton h-36" />
             ))}
           </div>
@@ -370,12 +364,12 @@ export default function Home() {
             <p style={{ color: '#B08070' }}>Nenhum presente nesta categoria.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {filteredGifts.map(gift => (
               <GiftCard
                 key={gift.id}
                 gift={gift}
-                claim={claims[String(gift.id)]}
+                claims={claims[String(gift.id)] ?? []}
                 isMyGift={userClaim?.giftId === gift.id}
                 hasUserClaimed={!!userClaim}
                 onClick={() => handleCardClick(gift)}
@@ -388,7 +382,7 @@ export default function Home() {
         {!loading && (
           <div className="mt-8 flex flex-wrap items-center justify-center gap-5">
             {[
-              { color: '#C9846B', label: 'Disponível' },
+              { color: '#C9846B', label: 'Disponível'  },
               { color: '#4CAF9A', label: 'Sua escolha' },
               { color: '#D4B8A8', label: 'Já escolhido' },
             ].map(({ color, label }) => (
@@ -419,7 +413,6 @@ export default function Home() {
         />
       )}
 
-      {/* ── TOASTS ───────────────────────────────────────────────────────────── */}
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />
     </main>
   )

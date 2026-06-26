@@ -5,6 +5,8 @@ export interface Gift {
   name: string
   brand?: string
   category: GiftCategory
+  /** Maximum number of claimants. null = unlimited. */
+  limit: number | null
 }
 
 export interface CategoryConfig {
@@ -61,20 +63,20 @@ export const categoryConfig: Record<GiftCategory, CategoryConfig> = {
 }
 
 export const gifts: Gift[] = [
-  { id: 1,  name: 'Body Splash Boa Noite + Hidratante para as Mãos',  brand: 'O Boticário',    category: 'beleza'     },
-  { id: 2,  name: 'Colônia Águas de Framboesa',                        brand: 'Natura',         category: 'beleza'     },
-  { id: 3,  name: 'Colônia Thaty',                                      brand: 'O Boticário',    category: 'beleza'     },
-  { id: 4,  name: 'Kit Lençol com Elástico e Fronha Queen (Jogo 1)',   brand: 'São Cristóvão',  category: 'casa'       },
-  { id: 5,  name: 'Kit Lençol com Elástico e Fronha Queen (Jogo 2)',   brand: 'São Cristóvão',  category: 'casa'       },
-  { id: 6,  name: 'Jogo de Lençol Queen',                              brand: 'São Cristóvão',  category: 'casa'       },
-  { id: 7,  name: 'Sandália Ortopédica de Dedo Nº 37',                 brand: 'Picadilly',      category: 'calcados'   },
-  { id: 8,  name: 'Sandália Ortopédica Nº 37',                         brand: 'Mondare',        category: 'calcados'   },
-  { id: 9,  name: 'Cuscuzeira Inox 2,5 Litros',                        brand: 'Tramontina',     category: 'cozinha'    },
-  { id: 10, name: 'Jogo de Pratos de Jantar (Pratos Fundos)',          brand: '',               category: 'cozinha'    },
-  { id: 11, name: '2 Pares de Brinco de Pressão',                     brand: '',               category: 'acessorios' },
-  { id: 12, name: 'Panela de Pressão 4,5 L',                          brand: 'Tramontina',     category: 'cozinha'    },
-  { id: 13, name: 'Conjunto de Corte de Bolo Inox',                   brand: 'Sanexc',         category: 'cozinha'    },
-  { id: 14, name: 'Kit Lençol Queen com Elástico + 2 Travesseiros',   brand: '',               category: 'casa'       },
-  { id: 15, name: 'Escova Secadora Giratória',                         brand: '',               category: 'beleza'     },
-  { id: 16, name: 'Pix R$ 200,00',                                     brand: '',               category: 'pix'        },
+  { id: 1,  name: 'Body Splash Boa Noite + Hidratante para as Mãos',  brand: 'O Boticário',    category: 'beleza',     limit: 1    },
+  { id: 2,  name: 'Colônia Águas de Framboesa',                        brand: 'Natura',         category: 'beleza',     limit: 1    },
+  { id: 3,  name: 'Colônia Thaty',                                      brand: 'O Boticário',    category: 'beleza',     limit: 1    },
+  { id: 4,  name: 'Kit Lençol com Elástico e Fronha Queen (Jogo 1)',   brand: 'São Cristóvão',  category: 'casa',       limit: 1    },
+  { id: 5,  name: 'Kit Lençol com Elástico e Fronha Queen (Jogo 2)',   brand: 'São Cristóvão',  category: 'casa',       limit: 1    },
+  { id: 6,  name: 'Jogo de Lençol Queen',                              brand: 'São Cristóvão',  category: 'casa',       limit: 1    },
+  { id: 7,  name: 'Sandália Ortopédica de Dedo Nº 37',                 brand: 'Picadilly',      category: 'calcados',   limit: 1    },
+  { id: 8,  name: 'Sandália Ortopédica Nº 37',                         brand: 'Mondare',        category: 'calcados',   limit: 1    },
+  { id: 9,  name: 'Cuscuzeira Inox 2,5 Litros',                        brand: 'Tramontina',     category: 'cozinha',    limit: 1    },
+  { id: 10, name: 'Jogo de Pratos de Jantar (Pratos Fundos)',          brand: '',               category: 'cozinha',    limit: 1    },
+  { id: 11, name: '2 Pares de Brinco de Pressão',                     brand: '',               category: 'acessorios', limit: 1    },
+  { id: 12, name: 'Panela de Pressão 4,5 L',                          brand: 'Tramontina',     category: 'cozinha',    limit: 1    },
+  { id: 13, name: 'Conjunto de Corte de Bolo Inox',                   brand: 'Sanexc',         category: 'cozinha',    limit: 1    },
+  { id: 14, name: 'Kit Lençol Queen com Elástico + 2 Travesseiros',   brand: '',               category: 'casa',       limit: 1    },
+  { id: 15, name: 'Escova Secadora Giratória',                         brand: '',               category: 'beleza',     limit: 1    },
+  { id: 16, name: 'Pix R$ 200,00',                                     brand: '',               category: 'pix',        limit: null },
 ]
