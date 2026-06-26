@@ -1,5 +1,6 @@
 export interface ClaimRecord {
   claimedBy: string
+  phone: string
   claimedAt: string
 }
 

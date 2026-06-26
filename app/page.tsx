@@ -10,6 +10,7 @@ import ToastContainer, { type Toast } from '@/components/ToastContainer'
 
 interface ClaimRecord {
   claimedBy: string
+  phone: string
   claimedAt: string
 }
 
@@ -73,12 +74,12 @@ export default function Home() {
   }, [fetchClaims])
 
   // ── Claim ────────────────────────────────────────────────────────────────────
-  const handleClaim = useCallback(async (giftId: number, userName: string) => {
+  const handleClaim = useCallback(async (giftId: number, userName: string, phone: string) => {
     const gift = gifts.find(g => g.id === giftId)
     if (!gift) return
 
     const now    = new Date().toISOString()
-    const record: ClaimRecord = { claimedBy: userName, claimedAt: now }
+    const record: ClaimRecord = { claimedBy: userName, phone, claimedAt: now }
     const key    = String(giftId)
 
     // Optimistic update
@@ -88,7 +89,7 @@ export default function Home() {
     }))
 
     // Persist to localStorage immediately (redundancy)
-    const local: UserClaim = { giftId, giftName: gift.name, userName, claimedAt: now }
+    const local: UserClaim = { giftId, giftName: gift.name, userName, phone, claimedAt: now }
     saveUserClaim(local)
     setUserClaim(local)
     setSelectedId(null)
@@ -97,7 +98,7 @@ export default function Home() {
       const res = await fetch('/api/gifts', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ giftId, claimedBy: userName }),
+        body:    JSON.stringify({ giftId, claimedBy: userName, phone }),
       })
 
       if (res.ok) {
@@ -408,7 +409,7 @@ export default function Home() {
       {selectedGift && (
         <ClaimModal
           gift={selectedGift}
-          onClaim={(name) => handleClaim(selectedGift.id, name)}
+          onClaim={(name, phone) => handleClaim(selectedGift.id, name, phone)}
           onClose={() => setSelectedId(null)}
         />
       )}

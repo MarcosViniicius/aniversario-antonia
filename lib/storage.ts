@@ -4,6 +4,7 @@ export interface UserClaim {
   giftId: number
   giftName: string
   userName: string
+  phone: string
   claimedAt: string
 }
 

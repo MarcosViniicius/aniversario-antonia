@@ -5,11 +5,11 @@ import { useRouter } from 'next/navigation'
 import {
   LogOut, RefreshCw, Trash2, Gift, CheckCircle2, Circle,
   Users, Package, ShoppingBag, ChefHat, Sparkles, Home,
-  Gem, Banknote,
+  Gem, Banknote, Phone,
 } from 'lucide-react'
 import { gifts, categoryConfig, type GiftCategory } from '@/lib/gifts-data'
 
-interface ClaimRecord { claimedBy: string; claimedAt: string }
+interface ClaimRecord { claimedBy: string; phone: string; claimedAt: string }
 type Claims = Record<string, ClaimRecord[]>
 
 const categoryIcons: Record<GiftCategory, React.ElementType> = {
@@ -250,11 +250,24 @@ export default function AdminPage() {
                             className="flex items-center justify-between gap-3 p-2.5 rounded-xl"
                             style={{ backgroundColor: '#F8F5F3' }}
                           >
-                            <div>
+                            <div className="flex-1 min-w-0">
                               <p className="text-sm font-semibold" style={{ color: '#3D2B1F' }}>
                                 {claim.claimedBy}
                               </p>
-                              <p className="text-xs" style={{ color: '#B08070' }}>
+                              {claim.phone && (
+                                <a
+                                  href={`https://wa.me/55${claim.phone.replace(/\D/g, '')}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1 text-xs hover:underline"
+                                  style={{ color: '#4CAF9A' }}
+                                  aria-label={`WhatsApp de ${claim.claimedBy}`}
+                                >
+                                  <Phone size={10} />
+                                  {claim.phone}
+                                </a>
+                              )}
+                              <p className="text-xs mt-0.5" style={{ color: '#B08070' }}>
                                 {fmt(claim.claimedAt)}
                               </p>
                             </div>

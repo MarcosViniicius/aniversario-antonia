@@ -13,7 +13,7 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  let body: { giftId?: unknown; claimedBy?: unknown }
+  let body: { giftId?: unknown; claimedBy?: unknown; phone?: unknown }
   try {
     body = await request.json()
   } catch {
@@ -22,9 +22,10 @@ export async function POST(request: NextRequest) {
 
   const giftId    = String(body.giftId    ?? '').trim()
   const claimedBy = String(body.claimedBy ?? '').trim()
+  const phone     = String(body.phone     ?? '').trim()
 
-  if (!giftId || !claimedBy) {
-    return NextResponse.json({ error: 'giftId e claimedBy são obrigatórios' }, { status: 400 })
+  if (!giftId || !claimedBy || !phone) {
+    return NextResponse.json({ error: 'giftId, claimedBy e phone são obrigatórios' }, { status: 400 })
   }
 
   const gift = gifts.find(g => g.id === Number(giftId))
@@ -43,7 +44,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Você já escolheu este presente' }, { status: 409 })
   }
 
-  claims[giftId] = [...current, { claimedBy, claimedAt: new Date().toISOString() }]
+  claims[giftId] = [...current, { claimedBy, phone, claimedAt: new Date().toISOString() }]
   await writeClaims(claims)
 
   return NextResponse.json(claims[giftId], { status: 201 })
