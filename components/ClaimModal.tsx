@@ -1,8 +1,10 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { X, Gift, Phone } from 'lucide-react'
+import { X, Gift, Phone, Copy, Check } from 'lucide-react'
 import { categoryConfig, type Gift as GiftType } from '@/lib/gifts-data'
+
+const PIX_KEY = process.env.NEXT_PUBLIC_PIX_KEY ?? ''
 
 interface Props {
   gift: GiftType
@@ -26,11 +28,23 @@ function digitsOnly(v: string): string {
 
 export default function ClaimModal({ gift, onClaim, onClose }: Props) {
   const cfg      = categoryConfig[gift.category]
+  const isPix    = gift.category === 'pix'
   const [name,       setName]       = useState('')
   const [phone,      setPhone]      = useState('')
   const [phoneDirty, setPhoneDirty] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const [copied,     setCopied]     = useState(false)
   const nameRef  = useRef<HTMLInputElement>(null)
+
+  const handleCopyPix = async () => {
+    try {
+      await navigator.clipboard.writeText(PIX_KEY)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2500)
+    } catch {
+      // clipboard not available
+    }
+  }
 
   useEffect(() => {
     const t = setTimeout(() => nameRef.current?.focus(), 80)
@@ -123,10 +137,37 @@ export default function ClaimModal({ gift, onClaim, onClose }: Props) {
           </div>
 
           {/* Gift preview */}
-          <div className="rounded-2xl p-4 mb-5" style={{ backgroundColor: cfg.bgColor, border: `1.5px solid ${cfg.borderColor}` }}>
+          <div className="rounded-2xl p-4 mb-4" style={{ backgroundColor: cfg.bgColor, border: `1.5px solid ${cfg.borderColor}` }}>
             <p className="text-sm font-semibold leading-snug" style={{ color: '#3D2B1F' }}>{gift.name}</p>
             {gift.brand && <p className="text-xs mt-1" style={{ color: cfg.color }}>{gift.brand}</p>}
           </div>
+
+          {/* PIX key — shown when NEXT_PUBLIC_PIX_KEY is set */}
+          {isPix && PIX_KEY && (
+            <div
+              className="rounded-xl p-3 mb-4 flex items-center justify-between gap-3"
+              style={{ backgroundColor: '#EDF7F5', border: '1.5px solid #A8DDD5' }}
+            >
+              <div className="min-w-0">
+                <p className="text-xs font-semibold mb-0.5" style={{ color: '#1A5A4A' }}>Chave Pix</p>
+                <p className="text-sm font-mono break-all" style={{ color: '#2D8070' }}>{PIX_KEY}</p>
+              </div>
+              <button
+                type="button"
+                onClick={handleCopyPix}
+                className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
+                style={{
+                  backgroundColor: copied ? '#4CAF9A' : 'white',
+                  color:           copied ? 'white' : '#2D8070',
+                  border:          `1px solid ${copied ? '#4CAF9A' : '#A8DDD5'}`,
+                }}
+                aria-label="Copiar chave Pix"
+              >
+                {copied ? <Check size={12} /> : <Copy size={12} />}
+                {copied ? 'Copiado!' : 'Copiar'}
+              </button>
+            </div>
+          )}
 
           {/* Form */}
           <form onSubmit={handleSubmit} noValidate>

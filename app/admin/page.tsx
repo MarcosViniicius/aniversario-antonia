@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import {
   LogOut, RefreshCw, Trash2, Gift, CheckCircle2, Circle,
   Users, Package, ShoppingBag, ChefHat, Sparkles, Home,
-  Gem, Banknote, Phone,
+  Gem, Banknote, Phone, Download,
 } from 'lucide-react'
 import { gifts, categoryConfig, type GiftCategory } from '@/lib/gifts-data'
 
@@ -82,6 +82,30 @@ export default function AdminPage() {
     }
   }
 
+  // ── CSV export ───────────────────────────────────────────────────────────────
+  const handleExportCSV = () => {
+    const escape = (v: string) => `"${v.replace(/"/g, '""')}"`
+    const header = ['Presente', 'Marca', 'Nome', 'Telefone', 'Data/Hora'].map(escape).join(',')
+    const rows   = gifts.flatMap(gift => {
+      const giftClaims = claims[String(gift.id)] ?? []
+      return giftClaims.map(c => [
+        escape(gift.name),
+        escape(gift.brand ?? ''),
+        escape(c.claimedBy),
+        escape(c.phone),
+        escape(fmt(c.claimedAt)),
+      ].join(','))
+    })
+    const csv  = [header, ...rows].join('\n')
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })
+    const url  = URL.createObjectURL(blob)
+    const a    = document.createElement('a')
+    a.href     = url
+    a.download = `presentes-antonia-${new Date().toISOString().slice(0, 10)}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   // ── Stats ────────────────────────────────────────────────────────────────────
   const regularGifts   = gifts.filter(g => g.limit !== null)
   const pixGift        = gifts.find(g => g.limit === null)
@@ -112,6 +136,16 @@ export default function AdminPage() {
           </div>
 
           <div className="flex items-center gap-2">
+            <button
+              onClick={handleExportCSV}
+              disabled={loading}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-opacity hover:opacity-70 disabled:opacity-40"
+              style={{ color: '#4CAF9A', border: '1px solid #A8DDD5', backgroundColor: 'white' }}
+              aria-label="Exportar CSV"
+            >
+              <Download size={13} />
+              <span className="hidden sm:inline">Exportar</span>
+            </button>
             <button
               onClick={() => fetchClaims(true)}
               disabled={refreshing}

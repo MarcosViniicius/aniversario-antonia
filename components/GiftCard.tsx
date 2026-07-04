@@ -159,9 +159,15 @@ export default function GiftCard({ gift, claims, isMyGift, hasUserClaimed, onCli
                   ? 'Seja o primeiro a contribuir'
                   : `${claims.length} contribuindo — participe também`}
               </span>
-              <p className="text-xs mt-2" style={{ color: '#8A9A96' }}>
-                Sua intenção será registrada. A chave Pix será informada no evento.
-              </p>
+              {process.env.NEXT_PUBLIC_PIX_KEY ? (
+                <p className="text-xs mt-2 font-mono break-all" style={{ color: '#2D8070' }}>
+                  Chave: {process.env.NEXT_PUBLIC_PIX_KEY}
+                </p>
+              ) : (
+                <p className="text-xs mt-2" style={{ color: '#8A9A96' }}>
+                  Sua intenção será registrada. A chave Pix será informada no evento.
+                </p>
+              )}
             </>
           )}
         </div>
