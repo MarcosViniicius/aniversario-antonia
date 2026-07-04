@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { gifts } from '@/lib/gifts-data'
-import { readClaims, writeClaims } from '@/lib/claims'
+import { readClaims, countClaims, insertClaim, deleteClaim } from '@/lib/claims'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -33,21 +33,27 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Presente não encontrado' }, { status: 404 })
   }
 
-  const claims  = await readClaims()
-  const current = claims[giftId] ?? []
-
-  if (gift.limit !== null && current.length >= gift.limit) {
-    return NextResponse.json({ error: 'Presente já escolhido' }, { status: 409 })
+  // Check limit before inserting (only for limited gifts)
+  if (gift.limit !== null) {
+    const current = await countClaims(giftId)
+    if (current >= gift.limit) {
+      return NextResponse.json({ error: 'Presente já escolhido' }, { status: 409 })
+    }
   }
 
-  if (current.some(c => c.claimedBy === claimedBy)) {
-    return NextResponse.json({ error: 'Você já escolheu este presente' }, { status: 409 })
+  try {
+    await insertClaim(giftId, { claimedBy, phone, claimedAt: new Date().toISOString() })
+  } catch (err: unknown) {
+    // Postgres unique violation: same person trying to claim again
+    const pgErr = err as { code?: string }
+    if (pgErr?.code === '23505') {
+      return NextResponse.json({ error: 'Você já escolheu este presente' }, { status: 409 })
+    }
+    console.error('[POST /api/gifts]', err)
+    return NextResponse.json({ error: 'Erro interno' }, { status: 500 })
   }
 
-  claims[giftId] = [...current, { claimedBy, phone, claimedAt: new Date().toISOString() }]
-  await writeClaims(claims)
-
-  return NextResponse.json(claims[giftId], { status: 201 })
+  return NextResponse.json({ success: true }, { status: 201 })
 }
 
 export async function DELETE(request: NextRequest) {
@@ -65,13 +71,11 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ error: 'giftId é obrigatório' }, { status: 400 })
   }
 
-  const claims = await readClaims()
-  const current = claims[giftId] ?? []
+  try {
+    await deleteClaim(giftId, claimedBy || undefined)
+  } catch {
+    return NextResponse.json({ error: 'Erro interno' }, { status: 500 })
+  }
 
-  claims[giftId] = claimedBy
-    ? current.filter(c => c.claimedBy !== claimedBy)
-    : []
-
-  await writeClaims(claims)
   return NextResponse.json({ success: true })
 }

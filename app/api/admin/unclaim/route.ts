@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { verifyToken, ADMIN_COOKIE } from '@/lib/admin-auth'
-import { readClaims, writeClaims } from '@/lib/claims'
+import { deleteClaim } from '@/lib/claims'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -28,13 +28,10 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ error: 'giftId é obrigatório' }, { status: 400 })
   }
 
-  const claims = await readClaims()
-  const before = claims[giftId] ?? []
-
-  claims[giftId] = claimedBy
-    ? before.filter(c => c.claimedBy !== claimedBy)
-    : []
-
-  await writeClaims(claims)
-  return NextResponse.json({ success: true, removed: before.length - (claims[giftId]?.length ?? 0) })
+  try {
+    const removed = await deleteClaim(giftId, claimedBy || undefined)
+    return NextResponse.json({ success: true, removed })
+  } catch {
+    return NextResponse.json({ error: 'Erro interno' }, { status: 500 })
+  }
 }

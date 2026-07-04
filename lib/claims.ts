@@ -1,45 +1,103 @@
+import { createClient } from '@supabase/supabase-js'
+
 export interface ClaimRecord {
   claimedBy: string
   phone: string
   claimedAt: string
 }
 
-// Each gift key maps to an array of claimants.
-// limit:1 gifts will have at most 1 entry; limit:null (PIX) can have many.
 export type ClaimsData = Record<string, ClaimRecord[]>
 
-const KV_KEY = 'gift-claims-v2'
+// ── Supabase client (server-side only, never exposed to browser) ─────────────
+function getClient() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!url || !key) throw new Error('Supabase env vars not set (NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)')
+  return createClient(url, key, { auth: { persistSession: false } })
+}
 
-// In-memory fallback for dev / when KV is not configured.
-// WARNING: not shared across serverless instances — configure Vercel KV for production.
+function hasSupabase(): boolean {
+  return !!(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY)
+}
+
+// In-memory fallback for local dev without Supabase configured
 const memStore: ClaimsData = {}
 
-export function hasKv(): boolean {
-  return !!(process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN)
-}
-
+// ── Read all claims, grouped by gift_id ──────────────────────────────────────
 export async function readClaims(): Promise<ClaimsData> {
-  if (hasKv()) {
-    try {
-      const { kv } = await import('@vercel/kv')
-      return (await kv.get<ClaimsData>(KV_KEY)) ?? {}
-    } catch (err) {
-      console.error('[KV] read error:', err)
-    }
+  if (!hasSupabase()) return JSON.parse(JSON.stringify(memStore)) as ClaimsData
+
+  const { data, error } = await getClient()
+    .from('gift_claims')
+    .select('gift_id, claimed_by, phone, claimed_at')
+    .order('claimed_at', { ascending: true })
+
+  if (error) {
+    console.error('[Supabase] readClaims:', error.message)
+    return {}
   }
-  return JSON.parse(JSON.stringify(memStore)) as ClaimsData
+
+  const result: ClaimsData = {}
+  for (const row of data ?? []) {
+    const key = String(row.gift_id)
+    if (!result[key]) result[key] = []
+    result[key].push({ claimedBy: row.claimed_by, phone: row.phone, claimedAt: row.claimed_at })
+  }
+  return result
 }
 
-export async function writeClaims(data: ClaimsData): Promise<void> {
-  if (hasKv()) {
-    try {
-      const { kv } = await import('@vercel/kv')
-      await kv.set(KV_KEY, data)
-      return
-    } catch (err) {
-      console.error('[KV] write error:', err)
-    }
+// ── Count claims for a specific gift ─────────────────────────────────────────
+export async function countClaims(giftId: string): Promise<number> {
+  if (!hasSupabase()) return (memStore[giftId] ?? []).length
+
+  const { count, error } = await getClient()
+    .from('gift_claims')
+    .select('*', { count: 'exact', head: true })
+    .eq('gift_id', Number(giftId))
+
+  if (error) {
+    console.error('[Supabase] countClaims:', error.message)
+    return 0
   }
-  Object.keys(memStore).forEach(k => delete memStore[k])
-  Object.assign(memStore, JSON.parse(JSON.stringify(data)))
+  return count ?? 0
+}
+
+// ── Insert a single claim ─────────────────────────────────────────────────────
+// Throws on DB error. Caller checks for duplicate (Postgres code 23505).
+export async function insertClaim(giftId: string, claim: ClaimRecord): Promise<void> {
+  if (!hasSupabase()) {
+    memStore[giftId] = [...(memStore[giftId] ?? []), claim]
+    return
+  }
+
+  const { error } = await getClient().from('gift_claims').insert({
+    gift_id:    Number(giftId),
+    claimed_by: claim.claimedBy,
+    phone:      claim.phone,
+    claimed_at: claim.claimedAt,
+  })
+
+  if (error) throw error
+}
+
+// ── Delete one or all claims for a gift ──────────────────────────────────────
+// Returns number of rows deleted.
+export async function deleteClaim(giftId: string, claimedBy?: string): Promise<number> {
+  if (!hasSupabase()) {
+    const before = (memStore[giftId] ?? []).length
+    memStore[giftId] = claimedBy
+      ? (memStore[giftId] ?? []).filter(c => c.claimedBy !== claimedBy)
+      : []
+    return before - (memStore[giftId]?.length ?? 0)
+  }
+
+  let query = getClient().from('gift_claims').delete({ count: 'exact' }).eq('gift_id', Number(giftId))
+  if (claimedBy) query = query.eq('claimed_by', claimedBy)
+
+  const { error, count } = await query
+  if (error) {
+    console.error('[Supabase] deleteClaim:', error.message)
+    throw error
+  }
+  return count ?? 0
 }
