@@ -330,6 +330,31 @@ export default function Home() {
           </p>
         </div>
 
+        {/* How it works — shown only before user claims */}
+        {!userClaim && !loading && (
+          <div
+            className="rounded-2xl p-4 mb-5 grid grid-cols-3 gap-3"
+            style={{ backgroundColor: 'white', border: '1px solid #F0E4DE' }}
+          >
+            {([
+              { n: '1', title: 'Escolha', desc: 'Clique no presente que quer dar' },
+              { n: '2', title: 'Preencha', desc: 'Seu nome e WhatsApp' },
+              { n: '3', title: 'Confirmado', desc: 'Reserva salva, ninguém mais pega' },
+            ] as const).map(({ n, title, desc }) => (
+              <div key={n} className="text-center">
+                <div
+                  className="w-7 h-7 rounded-full flex items-center justify-center mx-auto mb-2 text-xs font-bold text-white"
+                  style={{ background: 'linear-gradient(135deg, #C9846B, #C9A84C)' }}
+                >
+                  {n}
+                </div>
+                <p className="text-xs font-bold" style={{ color: '#3D2B1F' }}>{title}</p>
+                <p className="text-xs mt-0.5 leading-snug" style={{ color: '#B08070' }}>{desc}</p>
+              </div>
+            ))}
+          </div>
+        )}
+
         {/* Filter pills */}
         <div className="flex gap-2 overflow-x-auto pb-2 mb-5 scrollbar-hide">
           {FILTER_OPTIONS.map(opt => {

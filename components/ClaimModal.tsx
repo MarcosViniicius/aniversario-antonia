@@ -46,7 +46,7 @@ export default function ClaimModal({ gift, onClaim, onClose }: Props) {
   const phoneDigits   = digitsOnly(phone)
   const phoneValid    = phoneDigits.length >= 10  // 10 = fixo, 11 = celular
   const phoneError    = phoneDirty && !phoneValid
-  const canSubmit     = name.trim() && phoneValid
+  const canSubmit     = name.trim().length >= 2 && phoneValid
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setPhone(maskPhone(e.target.value))
@@ -144,6 +144,7 @@ export default function ClaimModal({ gift, onClaim, onClose }: Props) {
               required
               maxLength={50}
               autoComplete="given-name"
+              autoCapitalize="words"
               className="w-full px-4 py-3 rounded-xl text-sm outline-none mb-4"
               style={inputStyle(false)}
               onFocus={e => onFocus(e, false)}

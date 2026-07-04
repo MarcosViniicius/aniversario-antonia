@@ -31,7 +31,7 @@ export default function GiftCard({ gift, claims, isMyGift, hasUserClaimed, onCli
 
   const isUnlimited = gift.limit === null
   const isFull      = !isUnlimited && claims.length >= (gift.limit ?? 1)
-  const canClick    = !isFull && !hasUserClaimed
+  const canClick    = !isFull && !isMyGift
 
   // Visual state
   const borderColor = isMyGift  ? '#4CAF9A'
@@ -147,16 +147,23 @@ export default function GiftCard({ gift, claims, isMyGift, hasUserClaimed, onCli
                 {claims.find(c => c.claimedBy)?.claimedBy ?? ''} está contribuindo
               </span>
             </div>
-          ) : !hasUserClaimed ? (
-            <span
-              className="inline-block text-xs font-semibold px-3 py-1 rounded-full"
-              style={{ backgroundColor: cfg.bgColor, color: cfg.color }}
-            >
-              {claims.length === 0
-                ? 'Seja o primeiro a contribuir'
-                : `${claims.length} contribuindo — participe também`}
-            </span>
-          ) : null}
+          ) : (
+            <>
+              <span
+                className="inline-block text-xs font-semibold px-3 py-1 rounded-full"
+                style={{ backgroundColor: cfg.bgColor, color: cfg.color }}
+              >
+                {hasUserClaimed
+                  ? 'Clique para substituir'
+                  : claims.length === 0
+                  ? 'Seja o primeiro a contribuir'
+                  : `${claims.length} contribuindo — participe também`}
+              </span>
+              <p className="text-xs mt-2" style={{ color: '#8A9A96' }}>
+                Sua intenção será registrada. A chave Pix será informada no evento.
+              </p>
+            </>
+          )}
         </div>
       ) : isFull ? (
         // Regular gift — claimed
@@ -168,16 +175,14 @@ export default function GiftCard({ gift, claims, isMyGift, hasUserClaimed, onCli
         </div>
       ) : (
         // Regular gift — available
-        !hasUserClaimed && (
-          <div className="mt-auto">
-            <span
-              className="inline-block text-xs font-semibold px-3 py-1 rounded-full"
-              style={{ backgroundColor: cfg.bgColor, color: cfg.color }}
-            >
-              Disponível — clique para escolher
-            </span>
-          </div>
-        )
+        <div className="mt-auto">
+          <span
+            className="inline-block text-xs font-semibold px-3 py-1 rounded-full"
+            style={{ backgroundColor: cfg.bgColor, color: cfg.color }}
+          >
+            {hasUserClaimed ? 'Clique para substituir' : 'Disponível — clique para escolher'}
+          </span>
+        </div>
       )}
     </div>
   )
