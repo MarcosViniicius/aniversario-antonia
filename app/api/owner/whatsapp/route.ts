@@ -38,7 +38,11 @@ export async function GET(request: NextRequest) {
 
   // Proxy status or qr to the microservice
   const baseUrl = process.env.WHATSAPP_SERVICE_URL
-  if (!baseUrl) return NextResponse.json({ error: 'WHATSAPP_SERVICE_URL not configured' }, { status: 503 })
+  if (!baseUrl) {
+    return NextResponse.json({
+      error: 'WHATSAPP_SERVICE_URL não configurada na Vercel. Adicione a variável e faça Redeploy.',
+    }, { status: 503 })
+  }
 
   const endpoint = action === 'qr' ? '/qr' : '/status'
   try {
@@ -50,7 +54,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(data, { status: res.status })
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err)
-    return NextResponse.json({ error: 'Microservice unreachable: ' + msg }, { status: 503 })
+    return NextResponse.json({
+      error: `Microserviço inacessível (${baseUrl}): ${msg}`,
+    }, { status: 503 })
   }
 }
 
