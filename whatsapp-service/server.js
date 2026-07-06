@@ -47,9 +47,6 @@ function buildClient() {
     authStrategy: new LocalAuth({ dataPath: './.wwebjs_auth' }),
     puppeteer: {
       headless: true,
-      // In Docker: PUPPETEER_EXECUTABLE_PATH points to system Chromium.
-      // Outside Docker: undefined → Puppeteer uses its own bundled browser.
-      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH,
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
