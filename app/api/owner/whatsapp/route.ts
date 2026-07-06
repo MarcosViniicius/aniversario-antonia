@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
   }
 
   // Proxy status or qr to the microservice
-  const baseUrl = process.env.WHATSAPP_SERVICE_URL
+  const baseUrl = (process.env.WHATSAPP_SERVICE_URL ?? '').replace(/\/+$/, '')
   if (!baseUrl) {
     return NextResponse.json({
       error: 'WHATSAPP_SERVICE_URL não configurada na Vercel. Adicione a variável e faça Redeploy.',
@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
 
   const body = await request.json().catch(() => ({})) as Record<string, string>
 
-  const baseUrl = process.env.WHATSAPP_SERVICE_URL
+  const baseUrl = (process.env.WHATSAPP_SERVICE_URL ?? '').replace(/\/+$/, '')
   if (!baseUrl) return NextResponse.json({ error: 'WHATSAPP_SERVICE_URL not configured' }, { status: 503 })
 
   if (body.action === 'logout') {

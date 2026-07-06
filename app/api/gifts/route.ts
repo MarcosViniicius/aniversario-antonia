@@ -88,7 +88,7 @@ export async function DELETE(request: NextRequest) {
 async function sendWhatsApp({
   giftId, giftName, claimedBy, phone,
 }: { giftId: string; giftName: string; claimedBy: string; phone: string }) {
-  const serviceUrl = process.env.WHATSAPP_SERVICE_URL
+  const serviceUrl = (process.env.WHATSAPP_SERVICE_URL ?? '').replace(/\/+$/, '') || undefined
   const serviceKey = process.env.WHATSAPP_SERVICE_KEY ?? ''
 
   // Build message from template (DB setting, fallback to hardcoded)
