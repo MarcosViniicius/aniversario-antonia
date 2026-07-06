@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  whatsapp:
+    build: .
+    container_name: antonia80-whatsapp
+    restart: unless-stopped
+    ports:
+      - "${PORT:-3100}:3100"
+    environment:
+      PORT: 3100
+      API_KEY: ${API_KEY:?Defina API_KEY no arquivo .env}
+    volumes:
+      # Sessão do WhatsApp persiste entre restarts do container
+      - whatsapp-auth:/app/.wwebjs_auth
+    # Chromium precisa de memória compartilhada suficiente
+    shm_size: '256mb'
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >
+          node -e "require('http').get('http://localhost:3100/status',
+          r=>{process.exit(r.statusCode===200?0:1)}).on('error',()=>process.exit(1))"
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  whatsapp-auth:
+    driver: local
