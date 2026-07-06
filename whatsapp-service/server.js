@@ -1,6 +1,23 @@
 const express    = require('express')
 const { Client, LocalAuth } = require('whatsapp-web.js')
 const qrcode     = require('qrcode')
+const fs         = require('fs')
+const path       = require('path')
+
+// Remove Chromium singleton lock files left by a previous container instance.
+// Without this, a redeployed container fails to start because the lock references
+// a different hostname/PID from the old container.
+function cleanChromiumLocks(dir) {
+  if (!fs.existsSync(dir)) return
+  for (const name of ['SingletonLock', 'SingletonSocket', 'SingletonCookie']) {
+    const file = path.join(dir, name)
+    try { fs.unlinkSync(file); console.log('[WA] Removed stale lock:', file) } catch {}
+  }
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (entry.isDirectory()) cleanChromiumLocks(path.join(dir, entry.name))
+  }
+}
+cleanChromiumLocks('./.wwebjs_auth')
 
 const app    = express()
 const PORT   = process.env.PORT || 3100
@@ -38,6 +55,8 @@ function buildClient() {
         '--disable-setuid-sandbox',
         '--disable-dev-shm-usage',
         '--disable-gpu',
+        '--no-first-run',
+        '--disable-features=Translate,BackForwardCache',
       ],
     },
   })
