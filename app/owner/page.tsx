@@ -109,17 +109,19 @@ export default function OwnerPage() {
 
 // ── WhatsApp Tab ──────────────────────────────────────────────────────────────
 function WhatsAppTab({ showToast }: { showToast: (t:'ok'|'err', m:string) => void }) {
-  const [status,  setStatus]  = useState<WaStatus | null>(null)
-  const [qr,      setQr]      = useState<string | null>(null)
-  const [logs,    setLogs]    = useState<WaLog[]>([])
-  const [loading, setLoading] = useState(true)
-  const [polling, setPolling] = useState(false)
+  const [status,       setStatus]       = useState<WaStatus | null>(null)
+  const [serviceDown,  setServiceDown]  = useState(false)
+  const [qr,           setQr]           = useState<string | null>(null)
+  const [logs,         setLogs]         = useState<WaLog[]>([])
+  const [loading,      setLoading]      = useState(true)
+  const [polling,      setPolling]      = useState(false)
 
   const fetchStatus = useCallback(async () => {
     try {
       const res = await fetch('/api/owner/whatsapp?action=status')
-      if (res.ok) setStatus(await res.json())
-    } catch {}
+      if (res.ok) { setStatus(await res.json()); setServiceDown(false) }
+      else        { setServiceDown(true) }
+    } catch { setServiceDown(true) }
   }, [])
 
   const fetchQR = useCallback(async () => {
@@ -128,7 +130,7 @@ function WhatsAppTab({ showToast }: { showToast: (t:'ok'|'err', m:string) => voi
       const res = await fetch('/api/owner/whatsapp?action=qr')
       if (!res.ok) return
       const data = await res.json()
-      if (data.qr) setQr(data.qr)
+      if (data.qr)        { setQr(data.qr) }
       else if (data.connected) { setQr(null); fetchStatus() }
     } catch {}
     finally { setPolling(false) }
@@ -143,8 +145,7 @@ function WhatsAppTab({ showToast }: { showToast: (t:'ok'|'err', m:string) => voi
   }, [])
 
   useEffect(() => {
-    fetchStatus(); fetchLogs()
-    // Poll status every 5s while disconnected to detect QR scan
+    fetchStatus(); fetchQR(); fetchLogs()
     const iv = setInterval(() => { fetchStatus(); fetchQR() }, 5_000)
     return () => clearInterval(iv)
   }, [fetchStatus, fetchQR, fetchLogs])
@@ -155,8 +156,6 @@ function WhatsAppTab({ showToast }: { showToast: (t:'ok'|'err', m:string) => voi
     setStatus(null); setQr(null); fetchStatus()
   }
 
-  const statusErr = !status || (!status.connected && !status.hasQR)
-
   return (
     <div className="grid lg:grid-cols-2 gap-6">
       {/* Connection card */}
@@ -166,13 +165,14 @@ function WhatsAppTab({ showToast }: { showToast: (t:'ok'|'err', m:string) => voi
         {/* Status pill */}
         <div className="flex items-center gap-2 mb-4">
           {status?.connected
-            ? <><Wifi size={14} style={{ color: '#4CAF9A' }} /><span className="text-sm font-semibold" style={{ color: '#4CAF9A' }}>Conectado — {status.phone}</span></>
-            : <><WifiOff size={14} style={{ color: '#FF8080' }} /><span className="text-sm" style={{ color: '#FF8080' }}>Desconectado</span></>}
+            ? <><Wifi    size={14} style={{ color: '#4CAF9A' }} /><span className="text-sm font-semibold" style={{ color: '#4CAF9A' }}>Conectado — {status.phone}</span></>
+            : <><WifiOff size={14} style={{ color: '#FF8080' }} /><span className="text-sm"               style={{ color: '#FF8080' }}>Desconectado</span></>}
         </div>
 
-        {statusErr && (
-          <p className="text-xs mb-4" style={{ color: '#8AA0B8' }}>
-            WHATSAPP_SERVICE_URL não configurada ou microserviço offline.
+        {/* Microservice unreachable */}
+        {serviceDown && (
+          <p className="text-xs mb-4 p-3 rounded-xl" style={{ backgroundColor: '#2A1515', color: '#FF8080', border: '1px solid #5A2020' }}>
+            Microserviço inacessível. Verifique se o container Docker está rodando e se WHATSAPP_SERVICE_URL está correto na Vercel.
           </p>
         )}
 
@@ -185,10 +185,12 @@ function WhatsAppTab({ showToast }: { showToast: (t:'ok'|'err', m:string) => voi
           </div>
         )}
 
-        {!status?.connected && !qr && !statusErr && (
+        {/* Waiting for QR (service online, Chromium initializing) */}
+        {!serviceDown && !status?.connected && !qr && (
           <div className="text-center py-6">
             <QrCode size={40} style={{ color: '#4A90D9', margin: '0 auto 12px' }} />
-            <p className="text-xs" style={{ color: '#8AA0B8' }}>Gerando QR code...</p>
+            <p className="text-xs font-semibold" style={{ color: '#8AA0B8' }}>Aguardando QR code...</p>
+            <p className="text-xs mt-1" style={{ color: '#4A6080' }}>O Chromium pode levar até 30s para iniciar.</p>
           </div>
         )}
 
