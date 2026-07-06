@@ -12,6 +12,9 @@ services:
       API_KEY: ${API_KEY:?Defina API_KEY no ambiente}
     volumes:
       - whatsapp-auth:/app/.wwebjs_auth
+    # Chromium precisa de syscalls bloqueadas pelo seccomp padrão do Docker
+    security_opt:
+      - seccomp:unconfined
     mem_limit: 768m
     memswap_limit: 768m
     logging:
