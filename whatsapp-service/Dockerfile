@@ -1,25 +1,29 @@
+# syntax=docker/dockerfile:1
 FROM node:20-bookworm-slim
 
-# Install Chromium and dependencies needed for headless browser
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    chromium \
-    fonts-liberation \
-    libxss1 \
-  && rm -rf /var/lib/apt/lists/*
+# BuildKit cache mount — apt packages ficam em cache entre builds
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt-get update && apt-get install -y --no-install-recommends \
+        chromium \
+        libxss1 \
+    && rm -rf /var/lib/apt/lists/*
 
-# Tell Puppeteer to skip its own Chromium download and use the system one
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
-    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium \
+    NODE_ENV=production \
+    # Suprime tentativas de conexão D-Bus (inexistente em containers)
+    DBUS_SESSION_BUS_ADDRESS=/dev/null
 
 WORKDIR /app
 
-# Install dependencies first (better layer caching)
+# BuildKit cache mount — node_modules ficam em cache entre builds
 COPY package.json ./
-RUN npm install --omit=dev && npm cache clean --force
+RUN --mount=type=cache,target=/root/.npm \
+    npm install --omit=dev
 
 COPY server.js ./
 
-# Create session dir and hand ownership to the non-root node user
 RUN mkdir -p .wwebjs_auth && chown -R node:node /app
 
 USER node

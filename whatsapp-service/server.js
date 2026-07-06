@@ -55,8 +55,11 @@ function buildClient() {
         '--disable-setuid-sandbox',
         '--disable-dev-shm-usage',
         '--disable-gpu',
+        '--no-zygote',            // essencial para containers Docker
         '--no-first-run',
-        '--disable-features=Translate,BackForwardCache',
+        '--disable-extensions',
+        '--disable-background-networking',
+        '--disable-default-apps',
       ],
     },
   })
