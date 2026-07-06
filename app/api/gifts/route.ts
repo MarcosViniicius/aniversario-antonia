@@ -91,6 +91,8 @@ async function sendWhatsApp({
   const serviceUrl = (process.env.WHATSAPP_SERVICE_URL ?? '').replace(/\/+$/, '') || undefined
   const serviceKey = process.env.WHATSAPP_SERVICE_KEY ?? ''
 
+  console.log(`[WA] send → gift=${giftId} phone=${phone} serviceUrl=${serviceUrl ?? '(não configurado)'}`)
+
   // Build message from template (DB setting, fallback to hardcoded)
   let template = 'Ola {name}! Sua escolha de "{gift}" para o aniversario de 80 anos de Antonia Lucena foi confirmada. Obrigada!'
   try {
@@ -111,7 +113,9 @@ async function sendWhatsApp({
         .replace('{time}',  time)
         .replace('{place}', place)
     }
-  } catch {}
+  } catch (err) {
+    console.error('[WA] falha ao buscar template do Supabase:', err)
+  }
 
   // Fallback replacements if DB fetch failed
   template = template
@@ -133,18 +137,22 @@ async function sendWhatsApp({
         const d = await res.json().catch(() => ({}))
         status = 'failed'; error = d.error ?? `HTTP ${res.status}`
       }
+      console.log(`[WA] resposta do microserviço: status=${status} error=${error ?? 'nenhum'}`)
     } catch (err: unknown) {
       status = 'failed'; error = err instanceof Error ? err.message : String(err)
+      console.error('[WA] erro ao chamar microserviço:', error)
     }
   } else {
     status = 'pending'; error = 'WHATSAPP_SERVICE_URL not configured'
+    console.warn('[WA] WHATSAPP_SERVICE_URL não configurada — mensagem não enviada')
   }
 
   // Log to Supabase (best-effort)
   if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    try {
-      const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } })
-      await db.from('whatsapp_logs').insert({ gift_id: Number(giftId), claimed_by: claimedBy, phone, message: template, status, error })
-    } catch {}
+    const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } })
+    const { error: dbErr } = await db.from('whatsapp_logs').insert({ gift_id: Number(giftId), claimed_by: claimedBy, phone, message: template, status, error })
+    if (dbErr) console.error('[WA] falha ao gravar log no Supabase:', dbErr.message)
+  } else {
+    console.warn('[WA] Supabase não configurado — log não gravado')
   }
 }
