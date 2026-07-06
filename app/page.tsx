@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Calendar, Clock, MapPin, Gift, Heart, RefreshCw, CheckCircle2 } from 'lucide-react'
+import { Calendar, Clock, MapPin, Gift, Heart, CheckCircle2 } from 'lucide-react'
 import { gifts, categoryConfig, type GiftCategory, type Gift as GiftType } from '@/lib/gifts-data'
 import { getUserClaim, saveUserClaim, clearUserClaim, type UserClaim } from '@/lib/storage'
 import GiftCard from '@/components/GiftCard'
@@ -35,7 +35,6 @@ const regularGifts = gifts.filter(g => g.limit !== null)
 export default function Home() {
   const [claims,     setClaims]     = useState<Claims>({})
   const [loading,    setLoading]    = useState(true)
-  const [refreshing, setRefreshing] = useState(false)
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [userClaim,  setUserClaim]  = useState<UserClaim | null>(null)
   const [toasts,     setToasts]     = useState<Toast[]>([])
@@ -54,16 +53,12 @@ export default function Home() {
   }, [])
 
   // ── Fetch ────────────────────────────────────────────────────────────────────
-  const fetchClaims = useCallback(async (showSpinner = false) => {
-    if (showSpinner) setRefreshing(true)
+  const fetchClaims = useCallback(async () => {
     try {
       const res = await fetch('/api/gifts', { cache: 'no-store' })
       if (res.ok) setClaims(await res.json() as Claims)
     } catch { /* keep current state */ }
-    finally {
-      setLoading(false)
-      if (showSpinner) setTimeout(() => setRefreshing(false), 600)
-    }
+    finally { setLoading(false) }
   }, [])
 
   useEffect(() => {
@@ -167,12 +162,8 @@ export default function Home() {
   }, [claims, userClaim, addToast])
 
   // ── Derived ──────────────────────────────────────────────────────────────────
-  const selectedGift     = gifts.find(g => g.id === selectedId)
-  const claimedRegular   = regularGifts.filter(g => (claims[String(g.id)] ?? []).length > 0).length
-  const totalRegular     = regularGifts.length
-  const pixContributors  = (claims['16'] ?? []).length
-  const progressPct      = loading ? 0 : Math.round((claimedRegular / totalRegular) * 100)
-  const filteredGifts    = filter === 'todos' ? gifts : gifts.filter(g => g.category === filter)
+  const selectedGift  = gifts.find(g => g.id === selectedId)
+  const filteredGifts = filter === 'todos' ? gifts : gifts.filter(g => g.category === filter)
 
   return (
     <main className="min-h-screen" style={{ backgroundColor: '#FDF8F3' }}>
@@ -247,47 +238,6 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Progress strip */}
-        <div className="border-b" style={{ backgroundColor: 'white', borderColor: '#F0E4DE' }}>
-          <div className="max-w-4xl mx-auto px-4 py-3">
-            <div className="flex flex-wrap justify-between items-center gap-2 mb-1.5">
-              <div>
-                <p className="text-xs font-semibold" style={{ color: '#3D2B1F' }}>
-                  {loading
-                    ? 'Carregando...'
-                    : claimedRegular === totalRegular
-                    ? 'Todos os presentes foram escolhidos!'
-                    : `${claimedRegular} de ${totalRegular} presentes escolhidos`}
-                </p>
-                {!loading && pixContributors > 0 && (
-                  <p className="text-xs" style={{ color: '#4CAF9A' }}>
-                    {pixContributors} pessoa{pixContributors > 1 ? 's' : ''} contribuindo com Pix
-                  </p>
-                )}
-              </div>
-              <button
-                onClick={() => fetchClaims(true)}
-                disabled={refreshing}
-                className="flex items-center gap-1 text-xs px-2 py-1 rounded-lg transition-opacity hover:opacity-70"
-                style={{ color: '#B08070' }}
-                aria-label="Atualizar lista"
-              >
-                <RefreshCw size={13} className={refreshing ? 'animate-spin' : ''} />
-                <span>Atualizar</span>
-              </button>
-            </div>
-            <div className="h-2 rounded-full overflow-hidden" style={{ backgroundColor: '#F0E4DE' }}>
-              <div
-                className="h-full rounded-full"
-                style={{
-                  width: `${progressPct}%`,
-                  background: 'linear-gradient(90deg, #C9846B 0%, #C9A84C 100%)',
-                  transition: 'width 700ms ease',
-                }}
-              />
-            </div>
-          </div>
-        </div>
       </header>
 
       {/* ── BODY ─────────────────────────────────────────────────────────────── */}
