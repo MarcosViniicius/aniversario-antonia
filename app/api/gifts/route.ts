@@ -96,14 +96,20 @@ async function sendWhatsApp({
   const isPixGiftCategory = gifts.find(g => g.id === Number(giftId))?.category === 'pix'
 
   // Build message from template (DB setting, fallback to hardcoded)
-  let template = `🎉 *Confirmado, {name}!*
+  let template = `🎊 *{name}, sua reserva está confirmada!* ✅
 
-Sua escolha de *"{gift}"* foi registrada com sucesso para o aniversário de *80 anos de Antônia Lucena*. 🎂
+Que alegria contar com sua presença na celebração dos *80 anos de Antônia Lucena*! 🎂
 
-📅 *Data:* {date}
-⏰ *Horário:* {time}
-📍 *Local:* {place}
-🗺️ https://maps.app.goo.gl/1SQhCcoGbJZSMuaM6
+🎁 *Presente escolhido*
+└ {gift}
+
+━━━━━━━━━━━━━━━━━━
+📋 *Detalhes do evento*
+📅  {date}
+⏰  {time}
+📍  {place}
+🗺️  https://maps.app.goo.gl/1SQhCcoGbJZSMuaM6
+━━━━━━━━━━━━━━━━━━
 
 Te esperamos com muito carinho! 💛`
   try {
@@ -129,12 +135,13 @@ Te esperamos com muito carinho! 💛`
         .replace(/{pix_owner}/g,  s.pix_owner_name   ?? '')
         .replace(/{pix_receipt}/g, s.pix_receipt_phone ?? '')
 
-      // For PIX gifts: append PIX info if not already in template
-      const hasPixVars = template.includes(s.pix_key ?? '__none__')
-      if (isPixGiftCategory && s.pix_key && !hasPixVars) {
-        template += `\n\nChave Pix: ${s.pix_key}`
-        if (s.pix_owner_name)    template += ` (${s.pix_owner_name})`
-        if (s.pix_receipt_phone) template += `\nEnvie o comprovante para: ${s.pix_receipt_phone}`
+      // Para presentes PIX: appenda bloco PIX se não estiver no template
+      const hasPixInTemplate = s.pix_key ? template.includes(s.pix_key) : false
+      if (isPixGiftCategory && s.pix_key && !hasPixInTemplate) {
+        template += `\n\n━━━━━━━━━━━━━━━━━━\n💳 *Dados para o Pix*\n🔑  ${s.pix_key}`
+        if (s.pix_owner_name)    template += ` — _${s.pix_owner_name}_`
+        if (s.pix_receipt_phone) template += `\n📲  Comprovante: ${s.pix_receipt_phone}`
+        template += `\n━━━━━━━━━━━━━━━━━━`
       }
     }
   } catch (err) {

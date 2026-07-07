@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
   const isPix    = gift?.category === 'pix'
 
   // Build message (same logic as /api/gifts)
-  let template = `🎉 *Confirmado, {name}!*\n\nSua escolha de *"{gift}"* foi registrada com sucesso para o aniversário de *80 anos de Antônia Lucena*. 🎂\n\n📅 *Data:* {date}\n⏰ *Horário:* {time}\n📍 *Local:* {place}\n🗺️ https://maps.app.goo.gl/1SQhCcoGbJZSMuaM6\n\nTe esperamos com muito carinho! 💛`
+  let template = `🎊 *{name}, sua reserva está confirmada!* ✅\n\nQue alegria contar com sua presença na celebração dos *80 anos de Antônia Lucena*! 🎂\n\n🎁 *Presente escolhido*\n└ {gift}\n\n━━━━━━━━━━━━━━━━━━\n📋 *Detalhes do evento*\n📅  {date}\n⏰  {time}\n📍  {place}\n🗺️  https://maps.app.goo.gl/1SQhCcoGbJZSMuaM6\n━━━━━━━━━━━━━━━━━━\n\nTe esperamos com muito carinho! 💛`
 
   try {
     const { data: settingsData } = await db()
@@ -71,11 +71,12 @@ export async function POST(request: NextRequest) {
       .replace(/{pix_owner}/g,   s.pix_owner_name      ?? '')
       .replace(/{pix_receipt}/g, s.pix_receipt_phone   ?? '')
 
-    const hasPixVars = template.includes(s.pix_key ?? '__none__')
-    if (isPix && s.pix_key && !hasPixVars) {
-      template += `\n\nChave Pix: ${s.pix_key}`
-      if (s.pix_owner_name)    template += ` (${s.pix_owner_name})`
-      if (s.pix_receipt_phone) template += `\nEnvie o comprovante para: ${s.pix_receipt_phone}`
+    const hasPixInTemplate = s.pix_key ? template.includes(s.pix_key) : false
+    if (isPix && s.pix_key && !hasPixInTemplate) {
+      template += `\n\n━━━━━━━━━━━━━━━━━━\n💳 *Dados para o Pix*\n🔑  ${s.pix_key}`
+      if (s.pix_owner_name)    template += ` — _${s.pix_owner_name}_`
+      if (s.pix_receipt_phone) template += `\n📲  Comprovante: ${s.pix_receipt_phone}`
+      template += `\n━━━━━━━━━━━━━━━━━━`
     }
   } catch (err) {
     console.error('[resend] erro ao buscar settings:', err)

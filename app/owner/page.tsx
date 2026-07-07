@@ -495,7 +495,7 @@ function ConfigTab({ showToast }: { showToast: (t:'ok'|'err', m:string) => void 
     { key: 'event_place',       label: 'Local',                              placeholder: 'Buffet Diferentes Sabores' },
     { key: 'rsvp_deadline',     label: 'Prazo de confirmação',               placeholder: '20 de julho de 2026' },
     { key: 'whatsapp_template', label: 'Template da mensagem WhatsApp',
-      placeholder: 'Ola {name}! Sua escolha de "{gift}" foi confirmada...', multiline: true, section: 'WhatsApp' },
+      placeholder: '🎊 *{name}, sua reserva está confirmada!* ✅\n\n🎁 *Presente:* {gift}\n\n📅 {date} · ⏰ {time}\n📍 {place}\n\n💛', multiline: true, section: 'WhatsApp' },
   ]
 
   if (loading) return <p className="text-xs" style={{ color: '#8AA0B8' }}>Carregando...</p>
