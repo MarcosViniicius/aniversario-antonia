@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Calendar, Clock, MapPin, Gift, Heart, CheckCircle2 } from 'lucide-react'
-import { gifts, categoryConfig, type GiftCategory, type Gift as GiftType } from '@/lib/gifts-data'
+import { gifts as staticGifts, categoryConfig, type GiftCategory, type Gift as GiftType } from '@/lib/gifts-data'
 import { getUserClaim, saveUserClaim, clearUserClaim, type UserClaim } from '@/lib/storage'
 import GiftCard from '@/components/GiftCard'
 import ClaimModal from '@/components/ClaimModal'
@@ -29,10 +29,8 @@ const FILTER_OPTIONS: { value: Filter; label: string }[] = [
   { value: 'pix',        label: 'Contribuição' },
 ]
 
-// Regular gifts (limit: 1) — used for progress bar
-const regularGifts = gifts.filter(g => g.limit !== null)
-
 export default function Home() {
+  const [giftList,   setGiftList]   = useState<GiftType[]>(staticGifts)
   const [claims,     setClaims]     = useState<Claims>({})
   const [loading,    setLoading]    = useState(true)
   const [selectedId, setSelectedId] = useState<number | null>(null)
@@ -62,6 +60,13 @@ export default function Home() {
   }, [])
 
   useEffect(() => {
+    fetch('/api/gifts-catalog')
+      .then(r => r.ok ? r.json() : null)
+      .then((data: GiftType[] | null) => { if (Array.isArray(data) && data.length > 0) setGiftList(data) })
+      .catch(() => {})
+  }, [])
+
+  useEffect(() => {
     setUserClaim(getUserClaim())
     fetchClaims()
     pollRef.current = setInterval(() => fetchClaims(), 30_000)
@@ -70,7 +75,7 @@ export default function Home() {
 
   // ── Claim ────────────────────────────────────────────────────────────────────
   const handleClaim = useCallback(async (giftId: number, userName: string, phone: string) => {
-    const gift = gifts.find(g => g.id === giftId)
+    const gift = giftList.find(g => g.id === giftId)
     if (!gift) return
 
     const now    = new Date().toISOString()
@@ -113,7 +118,7 @@ export default function Home() {
       addToast('info', 'Problema na conexão. Sua escolha está salva localmente e será confirmada em breve.')
       fetchClaims()
     }
-  }, [addToast, fetchClaims])
+  }, [giftList, addToast, fetchClaims])
 
   // ── Unclaim ──────────────────────────────────────────────────────────────────
   const handleUnclaim = useCallback(async () => {
@@ -121,6 +126,11 @@ export default function Home() {
     const { giftId, userName } = userClaim
     const key = String(giftId)
 
+    // Save for rollback
+    const prevClaims    = claims
+    const prevUserClaim = userClaim
+
+    // Optimistic update
     setClaims(prev => ({
       ...prev,
       [key]: (prev[key] ?? []).filter(c => c.claimedBy !== userName),
@@ -129,17 +139,27 @@ export default function Home() {
     setUserClaim(null)
 
     try {
-      await fetch('/api/gifts', {
+      const res = await fetch('/api/gifts', {
         method:  'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({ giftId, claimedBy: userName }),
       })
-      addToast('info', 'Presente liberado. Você pode escolher outro!')
+      if (res.ok) {
+        addToast('info', 'Presente liberado. Você pode escolher outro!')
+      } else {
+        setClaims(prevClaims)
+        saveUserClaim(prevUserClaim)
+        setUserClaim(prevUserClaim)
+        addToast('error', 'Erro ao liberar. Tente novamente.')
+      }
     } catch {
+      setClaims(prevClaims)
+      saveUserClaim(prevUserClaim)
+      setUserClaim(prevUserClaim)
       addToast('error', 'Erro ao liberar. Tente novamente.')
       fetchClaims()
     }
-  }, [userClaim, addToast, fetchClaims])
+  }, [userClaim, claims, addToast, fetchClaims])
 
   // ── Card click ───────────────────────────────────────────────────────────────
   const handleCardClick = useCallback((gift: GiftType) => {
@@ -162,8 +182,8 @@ export default function Home() {
   }, [claims, userClaim, addToast])
 
   // ── Derived ──────────────────────────────────────────────────────────────────
-  const selectedGift  = gifts.find(g => g.id === selectedId)
-  const filteredGifts = filter === 'todos' ? gifts : gifts.filter(g => g.category === filter)
+  const selectedGift  = giftList.find(g => g.id === selectedId)
+  const filteredGifts = filter === 'todos' ? giftList : giftList.filter(g => g.category === filter)
 
   return (
     <main className="min-h-screen" style={{ backgroundColor: '#FDF8F3' }}>

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   LogOut, RefreshCw, Settings, MessageSquare, Gift,
@@ -115,6 +115,7 @@ function WhatsAppTab({ showToast }: { showToast: (t:'ok'|'err', m:string) => voi
   const [logs,         setLogs]         = useState<WaLog[]>([])
   const [loading,      setLoading]      = useState(true)
   const [polling,      setPolling]      = useState(false)
+  const prevConnectedRef = useRef<boolean | null>(null)
 
   const fetchStatus = useCallback(async () => {
     try {
@@ -130,7 +131,7 @@ function WhatsAppTab({ showToast }: { showToast: (t:'ok'|'err', m:string) => voi
       const res = await fetch('/api/owner/whatsapp?action=qr')
       if (!res.ok) return
       const data = await res.json()
-      if (data.qr)        { setQr(data.qr) }
+      if (data.qr)             { setQr(data.qr) }
       else if (data.connected) { setQr(null); fetchStatus() }
     } catch {}
     finally { setPolling(false) }
@@ -143,6 +144,15 @@ function WhatsAppTab({ showToast }: { showToast: (t:'ok'|'err', m:string) => voi
     } catch {}
     finally { setLoading(false) }
   }, [])
+
+  // Detect disconnect: when connected transitions true → false, clear old QR immediately
+  useEffect(() => {
+    const connected = status?.connected ?? null
+    if (prevConnectedRef.current === true && connected === false) {
+      setQr(null)
+    }
+    prevConnectedRef.current = connected
+  }, [status?.connected])
 
   useEffect(() => {
     fetchStatus(); fetchQR(); fetchLogs()
