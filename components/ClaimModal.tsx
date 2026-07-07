@@ -10,6 +10,9 @@ interface Props {
   gift: GiftType
   onClaim: (userName: string, phone: string) => Promise<void>
   onClose: () => void
+  prefillName?: string
+  prefillPhone?: string
+  giftNumber?: 1 | 2
 }
 
 /** Formats typed digits as (XX) XXXXX-XXXX or (XX) XXXX-XXXX */
@@ -26,11 +29,12 @@ function digitsOnly(v: string): string {
   return v.replace(/\D/g, '')
 }
 
-export default function ClaimModal({ gift, onClaim, onClose }: Props) {
+export default function ClaimModal({ gift, onClaim, onClose, prefillName = '', prefillPhone = '', giftNumber }: Props) {
   const cfg      = categoryConfig[gift.category]
   const isPix    = gift.category === 'pix'
-  const [name,       setName]       = useState('')
-  const [phone,      setPhone]      = useState('')
+  const hasPrefill = !!prefillName
+  const [name,       setName]       = useState(prefillName)
+  const [phone,      setPhone]      = useState(prefillPhone)
   const [phoneDirty, setPhoneDirty] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [copied,     setCopied]     = useState(false)
@@ -114,15 +118,21 @@ export default function ClaimModal({ gift, onClaim, onClose }: Props) {
           {/* Header */}
           <div className="flex items-start justify-between mb-5">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: cfg.bgColor }}>
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center relative" style={{ backgroundColor: cfg.bgColor }}>
                 <Gift size={18} style={{ color: cfg.color }} />
+                {giftNumber && (
+                  <span className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold text-white"
+                    style={{ background: 'linear-gradient(135deg,#C9846B,#C9A84C)', fontSize: 10 }}>
+                    {giftNumber}
+                  </span>
+                )}
               </div>
               <div>
                 <h2 id="modal-title" className="font-playfair text-lg font-semibold" style={{ color: '#3D2B1F' }}>
-                  Escolher presente
+                  {giftNumber === 2 ? '2º presente' : 'Escolher presente'}
                 </h2>
                 <p className="text-xs" style={{ color: '#B08070' }}>
-                  Preencha seus dados para reservar
+                  {hasPrefill ? 'Seus dados foram preenchidos automaticamente' : 'Preencha seus dados para reservar'}
                 </p>
               </div>
             </div>

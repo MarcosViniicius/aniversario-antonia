@@ -1,4 +1,5 @@
-const KEY = 'antonia80anos-minha-escolha'
+const KEY_V1 = 'antonia80anos-minha-escolha'
+const KEY_V2 = 'antonia80anos-minhas-escolhas'
 
 export interface UserClaim {
   giftId: number
@@ -8,30 +9,35 @@ export interface UserClaim {
   claimedAt: string
 }
 
-export function getUserClaim(): UserClaim | null {
-  if (typeof window === 'undefined') return null
+export function getUserClaims(): UserClaim[] {
+  if (typeof window === 'undefined') return []
   try {
-    const raw = localStorage.getItem(KEY)
-    return raw ? (JSON.parse(raw) as UserClaim) : null
+    const raw = localStorage.getItem(KEY_V2)
+    if (raw) return JSON.parse(raw) as UserClaim[]
+
+    // Migrate from v1 (single claim)
+    const old = localStorage.getItem(KEY_V1)
+    if (old) {
+      const migrated = [JSON.parse(old) as UserClaim]
+      localStorage.setItem(KEY_V2, JSON.stringify(migrated))
+      localStorage.removeItem(KEY_V1)
+      return migrated
+    }
+    return []
   } catch {
-    return null
+    return []
   }
 }
 
-export function saveUserClaim(claim: UserClaim): void {
+export function saveUserClaims(claims: UserClaim[]): void {
   if (typeof window === 'undefined') return
-  try {
-    localStorage.setItem(KEY, JSON.stringify(claim))
-  } catch {
-    // localStorage full or disabled — silent fail, server KV is primary
-  }
+  try { localStorage.setItem(KEY_V2, JSON.stringify(claims)) } catch {}
 }
 
-export function clearUserClaim(): void {
+export function clearUserClaims(): void {
   if (typeof window === 'undefined') return
   try {
-    localStorage.removeItem(KEY)
-  } catch {
-    // silent fail
-  }
+    localStorage.removeItem(KEY_V2)
+    localStorage.removeItem(KEY_V1)
+  } catch {}
 }
