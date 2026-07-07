@@ -3,20 +3,12 @@
 import { useEffect, useState } from 'react'
 import { X, Copy, Check, MessageCircle, ExternalLink, CheckCircle2 } from 'lucide-react'
 import type { Gift as GiftType } from '@/lib/gifts-data'
+import { waLink } from '@/lib/phone'
 
 interface PixSettings {
   pix_key?: string
   pix_owner_name?: string
   pix_receipt_phone?: string
-}
-
-function waReceiptLink(phone: string, giftName: string): string {
-  let d = phone.replace(/\D/g, '')
-  if (!d.startsWith('55')) d = '55' + d
-  const text = encodeURIComponent(
-    `Olá! Segue o comprovante do Pix referente à contribuição "${giftName}" para os 80 anos de Antônia Lucena. 🎂`
-  )
-  return `https://wa.me/${d}?text=${text}`
 }
 
 export default function PixSuccessModal({
@@ -157,7 +149,7 @@ export default function PixSuccessModal({
                   Após pagar, envie o comprovante:
                 </p>
                 <a
-                  href={waReceiptLink(pix.pix_receipt_phone, gift.name)}
+                  href={waLink(pix.pix_receipt_phone, `Olá! Segue o comprovante do Pix referente à contribuição "${gift.name}" para os 80 anos de Antônia Lucena. 🎂`)}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-2 w-full px-3 py-2.5 rounded-xl text-sm font-bold transition-all active:scale-95"

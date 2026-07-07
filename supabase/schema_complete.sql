@@ -94,3 +94,10 @@ UPDATE app_settings
 SET value = E'🎊 *{name}, sua reserva está confirmada!* ✅\n\nQue alegria contar com sua presença na celebração dos *80 anos de Antônia Lucena*! 🎂\n\n🎁 *Presente escolhido*\n└ {gift}\n\n━━━━━━━━━━━━━━━━━━\n📋 *Detalhes do evento*\n📅  {date}\n⏰  {time}\n📍  {place}\n🗺️  https://maps.app.goo.gl/1SQhCcoGbJZSMuaM6\n━━━━━━━━━━━━━━━━━━\n\nTe esperamos com muito carinho! 💛'
 WHERE key = 'whatsapp_template'
   AND value LIKE 'Ola {name}%';
+
+-- Permite múltiplas contribuições Pix do mesmo usuário (gift_id = 16).
+-- O índice único passa a proteger apenas presentes físicos (gift_id != 16).
+DROP INDEX IF EXISTS gift_claims_gift_person;
+CREATE UNIQUE INDEX gift_claims_gift_person
+  ON gift_claims (gift_id, claimed_by)
+  WHERE gift_id != 16;

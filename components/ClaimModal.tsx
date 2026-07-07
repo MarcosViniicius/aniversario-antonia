@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { X, Gift, Phone, Copy, Check, MessageCircle, ExternalLink } from 'lucide-react'
 import { categoryConfig, type Gift as GiftType } from '@/lib/gifts-data'
-import { maskPhone, digitsOnly } from '@/lib/phone'
+import { maskPhone, digitsOnly, normalizeBrPhone, mightMissNine, waLink } from '@/lib/phone'
 
 interface PixSettings {
   pix_key?: string
@@ -20,14 +20,6 @@ interface Props {
   giftNumber?: 1 | 2
 }
 
-function waReceiptLink(phone: string, giftName: string): string {
-  let d = phone.replace(/\D/g, '')
-  if (!d.startsWith('55')) d = '55' + d
-  const text = encodeURIComponent(
-    `Olá! Segue o comprovante do Pix referente à contribuição "${giftName}" para os 80 anos de Antônia Lucena. 🎂`
-  )
-  return `https://wa.me/${d}?text=${text}`
-}
 
 export default function ClaimModal({ gift, onClaim, onClose, prefillName = '', prefillPhone = '', giftNumber }: Props) {
   const cfg       = categoryConfig[gift.category]
@@ -86,7 +78,7 @@ export default function ClaimModal({ gift, onClaim, onClose, prefillName = '', p
     if (!canSubmit || submitting) return
     setSubmitting(true)
     try {
-      await onClaim(name.trim(), phone.trim())
+      await onClaim(name.trim(), normalizeBrPhone(phone))
     } finally {
       setSubmitting(false)
     }
@@ -214,7 +206,7 @@ export default function ClaimModal({ gift, onClaim, onClose, prefillName = '', p
                     Envie o comprovante para:
                   </p>
                   <a
-                    href={waReceiptLink(pixSettings.pix_receipt_phone, gift.name)}
+                    href={waLink(pixSettings.pix_receipt_phone, `Olá! Segue o comprovante do Pix referente à contribuição "${gift.name}" para os 80 anos de Antônia Lucena. 🎂`)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center gap-2 w-full px-3 py-2.5 rounded-xl text-sm font-bold transition-all active:scale-95"
@@ -289,6 +281,12 @@ export default function ClaimModal({ gift, onClaim, onClose, prefillName = '', p
             {phoneError && (
               <p id="phone-error" role="alert" className="text-xs mb-1" style={{ color: '#E05050' }}>
                 Digite um número válido com DDD (ex: (11) 99999-9999)
+              </p>
+            )}
+            {!phoneError && mightMissNine(phone) && (
+              <p className="text-xs mb-1" style={{ color: '#C9846B' }}>
+                Parece que falta o 9 — será salvo como{' '}
+                <span className="font-bold">{maskPhone(normalizeBrPhone(phone))}</span>
               </p>
             )}
             <p className="text-xs mb-5" style={{ color: '#B08070' }}>

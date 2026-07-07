@@ -115,13 +115,16 @@ export default function Home() {
     // Optimistic update
     setClaims(prev => ({ ...prev, [key]: [...(prev[key] ?? []), record] }))
     const prevUserClaims = userClaims
-    const newUserClaims  = [...userClaims, local]
-    saveUserClaims(newUserClaims)
-    setUserClaims(newUserClaims)
     setSelectedId(null)
 
-    // Para PIX: abre o modal de instruções imediatamente
-    if (isPix) setPixSuccess({ gift, userName })
+    // PIX não entra no localStorage/userClaims — só abre o modal de pagamento
+    if (isPix) {
+      setPixSuccess({ gift, userName })
+    } else {
+      const newUserClaims = [...userClaims, local]
+      saveUserClaims(newUserClaims)
+      setUserClaims(newUserClaims)
+    }
 
     try {
       const res = await fetch('/api/gifts', {
@@ -139,9 +142,12 @@ export default function Home() {
         }
       } else if (res.status === 409) {
         setClaims(prev => ({ ...prev, [key]: (prev[key] ?? []).filter(c => c.claimedBy !== userName) }))
-        saveUserClaims(prevUserClaims)
-        setUserClaims(prevUserClaims)
-        if (isPix) setPixSuccess(null)
+        if (!isPix) {
+          saveUserClaims(prevUserClaims)
+          setUserClaims(prevUserClaims)
+        } else {
+          setPixSuccess(null)
+        }
         addToast('error', 'Esse presente acabou de ser escolhido por outra pessoa. Tente outro!')
         fetchClaims()
       }
@@ -192,11 +198,12 @@ export default function Home() {
   // ── Card click ───────────────────────────────────────────────────────────────
   const handleCardClick = useCallback((gift: GiftType) => {
     const claimArr = claims[String(gift.id)] ?? []
+    const isPix    = gift.category === 'pix'
     const isFull   = gift.limit !== null && claimArr.length >= gift.limit
     if (isFull) return
-    if (userClaims.some(c => c.giftId === gift.id)) return
+    if (!isPix && userClaims.some(c => c.giftId === gift.id)) return
 
-    if (userClaims.length >= MAX_CLAIMS) {
+    if (!isPix && userClaims.length >= MAX_CLAIMS) {
       addToast('info', 'Você já escolheu 2 presentes. Clique em "Mudar" para trocar um deles.')
       return
     }
