@@ -96,7 +96,15 @@ async function sendWhatsApp({
   const isPixGiftCategory = gifts.find(g => g.id === Number(giftId))?.category === 'pix'
 
   // Build message from template (DB setting, fallback to hardcoded)
-  let template = 'Ola {name}! Sua escolha de "{gift}" para o aniversario de 80 anos de Antonia Lucena foi confirmada. Obrigada!'
+  let template = `🎉 *Confirmado, {name}!*
+
+Sua escolha de *"{gift}"* foi registrada com sucesso para o aniversário de *80 anos de Antônia Lucena*. 🎂
+
+📅 *Data:* {date}
+⏰ *Horário:* {time}
+📍 *Local:* {place}
+
+Te esperamos com muito carinho! 💛`
   try {
     if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
       const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } })
