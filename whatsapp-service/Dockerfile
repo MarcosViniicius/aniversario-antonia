@@ -34,10 +34,10 @@ ENV NODE_ENV=production \
 
 WORKDIR /app
 
-COPY package.json ./
-# npm install já faz o download do Chrome compatível com esta versão do puppeteer
+COPY package.json package-lock.json ./
+# npm ci garante versões fixas do lockfile (inclui puppeteer + Chrome exato)
 RUN --mount=type=cache,target=/root/.npm \
-    npm install --omit=dev
+    npm ci --omit=dev
 
 COPY server.js ./
 

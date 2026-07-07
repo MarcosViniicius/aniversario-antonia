@@ -65,20 +65,20 @@ function buildClient() {
   const client = new Client({
     authStrategy: new LocalAuth({ dataPath: './.wwebjs_auth' }),
     puppeteer: {
-      headless: true,
+      // puppeteer 22+: 'true' ativa new-headless. whatsapp-web.js precisa
+      // do modo 'shell' (headless clássico) para page.evaluate funcionar.
+      headless: 'shell',
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
         '--disable-gpu',
         '--disable-extensions',
         '--no-first-run',
-        // Prevent Chrome from throttling/backgrounding the renderer process,
-        // which can cause CDP page.evaluate calls to hang indefinitely.
-        '--disable-background-timer-throttling',
-        '--disable-renderer-backgrounding',
-        '--disable-backgrounding-occluded-windows',
-        '--disable-ipc-flooding-protection',
+        // --single-process: tudo roda no processo principal do Chrome.
+        // Em Docker, sem isso o renderer é um subprocess que pode ser
+        // morto pelo OOM killer enquanto o processo pai sobrevive —
+        // causando page.evaluate() travar indefinidamente.
+        '--single-process',
       ],
     },
   })
