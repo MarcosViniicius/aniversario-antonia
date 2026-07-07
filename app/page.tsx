@@ -8,6 +8,7 @@ import { phoneMatch } from '@/lib/phone'
 import GiftCard from '@/components/GiftCard'
 import ClaimModal from '@/components/ClaimModal'
 import VerifyModal from '@/components/VerifyModal'
+import PixSuccessModal from '@/components/PixSuccessModal'
 import ToastContainer, { type Toast } from '@/components/ToastContainer'
 
 interface ClaimRecord {
@@ -41,6 +42,7 @@ export default function Home() {
   const [toasts,      setToasts]      = useState<Toast[]>([])
   const [filter,      setFilter]      = useState<Filter>('todos')
   const [showVerify,  setShowVerify]  = useState(false)
+  const [pixSuccess,  setPixSuccess]  = useState<{ gift: GiftType; userName: string } | null>(null)
   const pollRef        = useRef<ReturnType<typeof setInterval>>()
   const hasValidatedRef = useRef(false)
 
@@ -103,6 +105,7 @@ export default function Home() {
   const handleClaim = useCallback(async (giftId: number, userName: string, phone: string) => {
     const gift = giftList.find(g => g.id === giftId)
     if (!gift) return
+    const isPix = gift.category === 'pix'
 
     const now    = new Date().toISOString()
     const record: ClaimRecord = { claimedBy: userName, phone, claimedAt: now }
@@ -117,6 +120,9 @@ export default function Home() {
     setUserClaims(newUserClaims)
     setSelectedId(null)
 
+    // Para PIX: abre o modal de instruções imediatamente
+    if (isPix) setPixSuccess({ gift, userName })
+
     try {
       const res = await fetch('/api/gifts', {
         method:  'POST',
@@ -125,14 +131,17 @@ export default function Home() {
       })
 
       if (res.ok) {
-        const isSecond = prevUserClaims.length === 1
-        addToast('success', isSecond
-          ? `Perfeito! Você escolheu seus 2 presentes. Obrigada, ${userName}!`
-          : `Ótimo, ${userName}! "${gift.name}" reservado com sucesso.`)
+        if (!isPix) {
+          const isSecond = prevUserClaims.length === 1
+          addToast('success', isSecond
+            ? `Perfeito! Você escolheu seus 2 presentes. Obrigada, ${userName}!`
+            : `Ótimo, ${userName}! "${gift.name}" reservado com sucesso.`)
+        }
       } else if (res.status === 409) {
         setClaims(prev => ({ ...prev, [key]: (prev[key] ?? []).filter(c => c.claimedBy !== userName) }))
         saveUserClaims(prevUserClaims)
         setUserClaims(prevUserClaims)
+        if (isPix) setPixSuccess(null)
         addToast('error', 'Esse presente acabou de ser escolhido por outra pessoa. Tente outro!')
         fetchClaims()
       }
@@ -553,6 +562,14 @@ export default function Home() {
           prefillName={firstClaim?.userName}
           prefillPhone={firstClaim?.phone}
           giftNumber={giftNumber}
+        />
+      )}
+
+      {pixSuccess && (
+        <PixSuccessModal
+          gift={pixSuccess.gift}
+          userName={pixSuccess.userName}
+          onClose={() => setPixSuccess(null)}
         />
       )}
 
