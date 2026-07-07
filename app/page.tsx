@@ -68,7 +68,7 @@ export default function Home() {
   }, [])
 
   useEffect(() => {
-    fetch('/api/gifts-catalog')
+    fetch('/api/gifts-catalog', { cache: 'no-store' })
       .then(r => r.ok ? r.json() : null)
       .then((data: GiftType[] | null) => {
         setGiftList(Array.isArray(data) && data.length > 0 ? data : staticGifts)

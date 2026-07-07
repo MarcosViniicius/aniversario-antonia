@@ -10,7 +10,7 @@ function getClient() {
 
 /**
  * Reads all active gifts from Supabase, ordered by sort_order.
- * Falls back to the static list if the DB is unavailable.
+ * Falls back to the static list only if the DB is unavailable.
  */
 export async function getGifts(): Promise<Gift[]> {
   try {
@@ -20,8 +20,17 @@ export async function getGifts(): Promise<Gift[]> {
       .eq('active', true)
       .order('sort_order')
 
-    if (error || !data?.length) return staticGifts
+    if (error) {
+      console.error('[gifts-db] Supabase error:', error.message, '— using static fallback')
+      return staticGifts
+    }
 
+    if (!data?.length) {
+      console.warn('[gifts-db] gifts table is empty — using static fallback')
+      return staticGifts
+    }
+
+    console.log(`[gifts-db] loaded ${data.length} gifts from DB`)
     return data.map(row => ({
       id:       row.id       as number,
       name:     row.name     as string,
@@ -29,7 +38,8 @@ export async function getGifts(): Promise<Gift[]> {
       category: row.category as GiftCategory,
       limit:    row.gift_limit as number | null,
     }))
-  } catch {
+  } catch (err) {
+    console.error('[gifts-db] unexpected error:', err, '— using static fallback')
     return staticGifts
   }
 }
