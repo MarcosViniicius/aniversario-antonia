@@ -461,6 +461,23 @@ function PresentesTab({ showToast }: { showToast: (t:'ok'|'err', m:string) => vo
   )
 }
 
+const DEFAULT_WA_TEMPLATE = `🎊 *{name}, sua reserva está confirmada!* ✅
+
+Que alegria contar com sua presença na celebração dos *80 anos de Antônia Lucena*! 🎂
+
+🎁 *Presente escolhido*
+└ {gift}
+
+━━━━━━━━━━━━━━━━━━
+📋 *Detalhes do evento*
+📅  {date}
+⏰  {time}
+📍  {place}
+🗺️  https://maps.app.goo.gl/1SQhCcoGbJZSMuaM6
+━━━━━━━━━━━━━━━━━━
+
+Te esperamos com muito carinho! 💛`
+
 // ── Config Tab ────────────────────────────────────────────────────────────────
 function ConfigTab({ showToast }: { showToast: (t:'ok'|'err', m:string) => void }) {
   const [settings, setSettings] = useState<AppSettings>({})
@@ -514,12 +531,24 @@ function ConfigTab({ showToast }: { showToast: (t:'ok'|'err', m:string) => void 
                 {section}
               </p>
             )}
-            <label className="block text-xs font-semibold mb-1.5" style={{ color: '#C0D0E0' }}>{label}</label>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-xs font-semibold" style={{ color: '#C0D0E0' }}>{label}</label>
+              {key === 'whatsapp_template' && (
+                <button
+                  type="button"
+                  onClick={() => set('whatsapp_template', DEFAULT_WA_TEMPLATE)}
+                  className="text-xs px-2 py-0.5 rounded-lg transition-opacity hover:opacity-80"
+                  style={{ color: '#4A90D9', border: '1px solid #2A3A4A', backgroundColor: '#0F1923' }}
+                >
+                  ↺ Restaurar padrão
+                </button>
+              )}
+            </div>
             {multiline ? (
-              <textarea rows={3} value={settings[key] ?? ''} onChange={e => set(key, e.target.value)}
+              <textarea rows={key === 'whatsapp_template' ? 12 : 3} value={settings[key] ?? ''} onChange={e => set(key, e.target.value)}
                 placeholder={placeholder}
-                className="w-full px-3 py-2 rounded-xl text-sm outline-none resize-none"
-                style={{ backgroundColor: '#0F1923', border: '1px solid #2A3A4A', color: '#E8F0FE' }}
+                className="w-full px-3 py-2 rounded-xl text-sm outline-none font-mono"
+                style={{ backgroundColor: '#0F1923', border: '1px solid #2A3A4A', color: '#E8F0FE', resize: 'vertical' }}
               />
             ) : (
               <input type="text" value={settings[key] ?? ''} onChange={e => set(key, e.target.value)}
