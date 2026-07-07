@@ -72,10 +72,25 @@ CREATE TABLE IF NOT EXISTS app_settings (
 );
 
 INSERT INTO app_settings (key, value) VALUES
-  ('pix_key',           ''),
-  ('event_date',        '16 de Agosto de 2026'),
-  ('event_time',        '18h30'),
-  ('event_place',       'Buffet Diferentes Sabores'),
-  ('rsvp_deadline',     '20 de julho de 2026'),
-  ('whatsapp_template', 'Ola {name}! Sua escolha de "{gift}" para o aniversario de 80 anos de Antonia Lucena foi confirmada. Te esperamos no dia {date} as {time} no {place}. Obrigada!')
+  ('pix_key',            ''),
+  ('pix_owner_name',     ''),
+  ('pix_receipt_phone',  ''),
+  ('event_date',         '16 de Agosto de 2026'),
+  ('event_time',         '18h30'),
+  ('event_place',        'Buffet Diferentes Sabores'),
+  ('rsvp_deadline',      '20 de julho de 2026'),
+  ('whatsapp_template',  E'🎊 *{name}, sua reserva está confirmada!* ✅\n\nQue alegria contar com sua presença na celebração dos *80 anos de Antônia Lucena*! 🎂\n\n🎁 *Presente escolhido*\n└ {gift}\n\n━━━━━━━━━━━━━━━━━━\n📋 *Detalhes do evento*\n📅  {date}\n⏰  {time}\n📍  {place}\n🗺️  https://maps.app.goo.gl/1SQhCcoGbJZSMuaM6\n━━━━━━━━━━━━━━━━━━\n\nTe esperamos com muito carinho! 💛')
 ON CONFLICT (key) DO NOTHING;
+
+-- ── Script de migração (rode se o banco já existe) ────────────────────────────
+-- Insere apenas as chaves que ainda não existem:
+INSERT INTO app_settings (key, value) VALUES
+  ('pix_owner_name',    ''),
+  ('pix_receipt_phone', '')
+ON CONFLICT (key) DO NOTHING;
+
+-- Atualiza o template para o novo formato (apenas se ainda tiver o texto antigo):
+UPDATE app_settings
+SET value = E'🎊 *{name}, sua reserva está confirmada!* ✅\n\nQue alegria contar com sua presença na celebração dos *80 anos de Antônia Lucena*! 🎂\n\n🎁 *Presente escolhido*\n└ {gift}\n\n━━━━━━━━━━━━━━━━━━\n📋 *Detalhes do evento*\n📅  {date}\n⏰  {time}\n📍  {place}\n🗺️  https://maps.app.goo.gl/1SQhCcoGbJZSMuaM6\n━━━━━━━━━━━━━━━━━━\n\nTe esperamos com muito carinho! 💛'
+WHERE key = 'whatsapp_template'
+  AND value LIKE 'Ola {name}%';
