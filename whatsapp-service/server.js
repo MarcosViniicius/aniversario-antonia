@@ -135,10 +135,19 @@ app.post('/send', async (req, res) => {
   const normalized = (digits.startsWith('55') ? digits : '55' + digits) + '@c.us'
 
   try {
-    await waClient.sendMessage(normalized, message)
+    const timeout = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('sendMessage timeout — sessão em estado inválido')), 15_000)
+    )
+    await Promise.race([waClient.sendMessage(normalized, message), timeout])
     res.json({ success: true, to: normalized })
   } catch (err) {
     console.error('[WA] Send error:', err.message)
+    // Sessão travada: reseta estado e reconecta automaticamente
+    if (err.message.includes('timeout')) {
+      console.warn('[WA] Sessão inválida detectada — reconectando...')
+      isReady = false; connectedPhone = null; qrDataURL = null
+      setTimeout(buildClient, 1_000)
+    }
     res.status(500).json({ error: err.message })
   }
 })
