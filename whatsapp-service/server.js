@@ -5,8 +5,6 @@ const fs         = require('fs')
 const path       = require('path')
 
 // Remove Chromium singleton lock files left by a previous container instance.
-// Without this, a redeployed container fails to start because the lock references
-// a different hostname/PID from the old container.
 function cleanChromiumLocks(dir) {
   if (!fs.existsSync(dir)) return
   for (const name of ['SingletonLock', 'SingletonSocket', 'SingletonCookie']) {
@@ -23,9 +21,7 @@ const app    = express()
 const PORT   = process.env.PORT || 3100
 const APIKEY = process.env.API_KEY || ''
 
-if (!APIKEY) {
-  console.warn('[WARN] API_KEY not set — all requests will be rejected')
-}
+if (!APIKEY) console.warn('[WARN] API_KEY not set — all requests will be rejected')
 
 app.use(express.json())
 
@@ -38,9 +34,32 @@ app.use((req, res, next) => {
 })
 
 // ── WhatsApp client state ─────────────────────────────────────────────────────
-let qrDataURL    = null   // base64 QR image while disconnected
-let isReady      = false
+let waClient      = null
+let qrDataURL     = null
+let isReady       = false
 let connectedPhone = null
+let isRestarting  = false
+
+async function restartClient(delayMs = 5_000) {
+  if (isRestarting) return
+  isRestarting   = true
+  isReady        = false
+  connectedPhone = null
+  qrDataURL      = null
+
+  const old = waClient
+  waClient = null
+
+  if (old) {
+    try { await old.destroy() } catch {}
+  }
+  cleanChromiumLocks('./.wwebjs_auth')
+
+  setTimeout(() => {
+    isRestarting = false
+    waClient = buildClient()
+  }, delayMs)
+}
 
 function buildClient() {
   const client = new Client({
@@ -60,7 +79,7 @@ function buildClient() {
 
   client.on('qr', async (qr) => {
     try { qrDataURL = await qrcode.toDataURL(qr) } catch {}
-    isReady       = false
+    isReady        = false
     connectedPhone = null
     console.log('[WA] QR code generated — scan with WhatsApp')
   })
@@ -71,91 +90,78 @@ function buildClient() {
   })
 
   client.on('ready', () => {
-    isReady       = true
-    qrDataURL     = null
+    isReady        = true
+    qrDataURL      = null
     connectedPhone = client.info?.wid?.user ?? null
     console.log('[WA] Ready — phone:', connectedPhone)
   })
 
   client.on('disconnected', (reason) => {
-    isReady       = false
-    connectedPhone = null
-    qrDataURL     = null
     console.log('[WA] Disconnected:', reason, '— restarting in 5s')
-    setTimeout(buildClient, 5_000)
+    restartClient(5_000)
   })
 
   client.on('auth_failure', (msg) => {
-    console.error('[WA] Auth failure:', msg)
+    console.error('[WA] Auth failure:', msg, '— restarting in 10s')
+    restartClient(10_000)
   })
 
   client.initialize().catch(err => {
     console.error('[WA] Initialize error:', err.message)
-    setTimeout(buildClient, 10_000)
+    restartClient(10_000)
   })
 
   return client
 }
 
-let waClient = buildClient()
+waClient = buildClient()
 
 // ── Routes ────────────────────────────────────────────────────────────────────
 
-// GET /status — connection info
 app.get('/status', (_req, res) => {
-  res.json({
-    connected:    isReady,
-    phone:        connectedPhone,
-    hasQR:        !!qrDataURL,
-  })
+  res.json({ connected: isReady, phone: connectedPhone, hasQR: !!qrDataURL })
 })
 
-// GET /qr — returns base64 QR image (or connected:true if already up)
 app.get('/qr', (_req, res) => {
-  if (isReady)     return res.json({ connected: true })
-  if (!qrDataURL)  return res.json({ waiting: true, message: 'QR not yet generated — retry in a few seconds' })
+  if (isReady)    return res.json({ connected: true })
+  if (!qrDataURL) return res.json({ waiting: true, message: 'QR not yet generated — retry in a few seconds' })
   res.json({ qr: qrDataURL })
 })
 
-// POST /send — send a WhatsApp message
-// Body: { phone: "(85) 99999-9999", message: "Olá!" }
 app.post('/send', async (req, res) => {
   const { phone, message } = req.body ?? {}
 
   if (!phone || !message) {
     return res.status(400).json({ error: 'phone and message are required' })
   }
-
-  if (!isReady) {
+  if (!isReady || !waClient) {
     return res.status(503).json({ error: 'WhatsApp not connected — scan the QR code first' })
   }
 
-  // Normalize phone → 55XXXXXXXXXXX@c.us
-  const digits = String(phone).replace(/\D/g, '')
+  // Normalize → 55XXXXXXXXXXX@c.us
+  const digits     = String(phone).replace(/\D/g, '')
   const normalized = (digits.startsWith('55') ? digits : '55' + digits) + '@c.us'
 
   try {
-    const timeout = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('sendMessage timeout — sessão em estado inválido')), 15_000)
+    const sendTimeout = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('sendMessage timeout')), 20_000)
     )
-    await Promise.race([waClient.sendMessage(normalized, message), timeout])
+    await Promise.race([waClient.sendMessage(normalized, message), sendTimeout])
+    console.log('[WA] Sent to', normalized)
     res.json({ success: true, to: normalized })
   } catch (err) {
     console.error('[WA] Send error:', err.message)
-    // Sessão travada: reseta estado e reconecta automaticamente
     if (err.message.includes('timeout')) {
-      console.warn('[WA] Sessão inválida detectada — reconectando...')
-      isReady = false; connectedPhone = null; qrDataURL = null
-      setTimeout(buildClient, 1_000)
+      console.warn('[WA] Browser em estado inválido — reiniciando sessão')
+      restartClient(1_000)
     }
     res.status(500).json({ error: err.message })
   }
 })
 
-// POST /logout — disconnect WhatsApp session
 app.post('/logout', async (_req, res) => {
   try {
-    await waClient.logout()
+    await waClient?.logout()
     res.json({ success: true })
   } catch (err) {
     res.status(500).json({ error: err.message })
