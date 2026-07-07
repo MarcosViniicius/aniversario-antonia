@@ -73,6 +73,12 @@ function buildClient() {
         '--disable-gpu',
         '--disable-extensions',
         '--no-first-run',
+        // Prevent Chrome from throttling/backgrounding the renderer process,
+        // which can cause CDP page.evaluate calls to hang indefinitely.
+        '--disable-background-timer-throttling',
+        '--disable-renderer-backgrounding',
+        '--disable-backgrounding-occluded-windows',
+        '--disable-ipc-flooding-protection',
       ],
     },
   })
@@ -90,10 +96,32 @@ function buildClient() {
   })
 
   client.on('ready', () => {
-    isReady        = true
     qrDataURL      = null
     connectedPhone = client.info?.wid?.user ?? null
-    console.log('[WA] Ready — phone:', connectedPhone)
+    console.log('[WA] Ready — phone:', connectedPhone, '— validating CDP…')
+
+    // Do a quick page.evaluate to confirm CDP is actually responsive.
+    // If it hangs, the session is silently broken and we restart early.
+    const page = client.pupPage
+    if (!page) {
+      console.warn('[WA] pupPage unavailable — marking ready without validation')
+      isReady = true
+      return
+    }
+    Promise.race([
+      page.evaluate(() => true),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('CDP validation timeout')), 8_000)
+      ),
+    ])
+      .then(() => {
+        isReady = true
+        console.log('[WA] CDP validated — ready to send')
+      })
+      .catch(err => {
+        console.error('[WA] CDP validation failed:', err.message, '— restarting in 3s')
+        restartClient(3_000)
+      })
   })
 
   client.on('disconnected', (reason) => {
