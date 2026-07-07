@@ -1,11 +1,13 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Calendar, Clock, MapPin, Gift, Heart, CheckCircle2, X } from 'lucide-react'
+import { Calendar, Clock, MapPin, Gift, Heart, CheckCircle2, X, Search } from 'lucide-react'
 import { gifts as staticGifts, categoryConfig, type GiftCategory, type Gift as GiftType } from '@/lib/gifts-data'
 import { getUserClaims, saveUserClaims, clearUserClaims, type UserClaim } from '@/lib/storage'
+import { phoneMatch } from '@/lib/phone'
 import GiftCard from '@/components/GiftCard'
 import ClaimModal from '@/components/ClaimModal'
+import VerifyModal from '@/components/VerifyModal'
 import ToastContainer, { type Toast } from '@/components/ToastContainer'
 
 interface ClaimRecord {
@@ -38,7 +40,9 @@ export default function Home() {
   const [userClaims,  setUserClaims]  = useState<UserClaim[]>([])
   const [toasts,      setToasts]      = useState<Toast[]>([])
   const [filter,      setFilter]      = useState<Filter>('todos')
-  const pollRef = useRef<ReturnType<typeof setInterval>>()
+  const [showVerify,  setShowVerify]  = useState(false)
+  const pollRef        = useRef<ReturnType<typeof setInterval>>()
+  const hasValidatedRef = useRef(false)
 
   // ── Toasts ───────────────────────────────────────────────────────────────────
   const addToast = useCallback((type: Toast['type'], message: string) => {
@@ -73,6 +77,27 @@ export default function Home() {
     pollRef.current = setInterval(() => fetchClaims(), 30_000)
     return () => clearInterval(pollRef.current)
   }, [fetchClaims])
+
+  // ── Validação do cache local contra o servidor ───────────────────────────
+  // Roda uma vez após o carregamento inicial. Remove do localStorage qualquer
+  // reserva que o admin já tenha excluído do servidor.
+  useEffect(() => {
+    if (loading || hasValidatedRef.current) return
+    hasValidatedRef.current = true
+    const local = getUserClaims()
+    if (local.length === 0) return
+    const validated = local.filter(uc => {
+      const serverRecs = claims[String(uc.giftId)] ?? []
+      return serverRecs.some(sc =>
+        sc.claimedBy === uc.userName || phoneMatch(sc.phone, uc.phone)
+      )
+    })
+    if (validated.length < local.length) {
+      saveUserClaims(validated)
+      setUserClaims(validated)
+      addToast('info', 'Algumas reservas foram removidas pelo organizador.')
+    }
+  }, [loading, claims, addToast])
 
   // ── Claim ────────────────────────────────────────────────────────────────────
   const handleClaim = useCallback(async (giftId: number, userName: string, phone: string) => {
@@ -338,17 +363,28 @@ export default function Home() {
         )}
 
         {/* Section title */}
-        <div className="mb-5">
-          <h2 className="font-playfair text-2xl font-bold" style={{ color: '#3D2B1F' }}>
-            Lista de Presentes
-          </h2>
-          <p className="text-sm mt-1" style={{ color: '#B08070' }}>
-            {userClaims.length >= MAX_CLAIMS
-              ? 'Você escolheu seus 2 presentes. Obrigada!'
-              : userClaims.length === 1
-              ? 'Você pode escolher mais 1 presente.'
-              : 'Escolha até 2 presentes. Clique em um disponível para reservar.'}
-          </p>
+        <div className="mb-5 flex items-start justify-between gap-3">
+          <div>
+            <h2 className="font-playfair text-2xl font-bold" style={{ color: '#3D2B1F' }}>
+              Lista de Presentes
+            </h2>
+            <p className="text-sm mt-1" style={{ color: '#B08070' }}>
+              {userClaims.length >= MAX_CLAIMS
+                ? 'Você escolheu seus 2 presentes. Obrigada!'
+                : userClaims.length === 1
+                ? 'Você pode escolher mais 1 presente.'
+                : 'Escolha até 2 presentes. Clique em um disponível para reservar.'}
+            </p>
+          </div>
+          <button
+            onClick={() => setShowVerify(true)}
+            className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all hover:bg-white active:scale-95"
+            style={{ color: '#7A5C4E', border: '1.5px solid #E5D5CF', backgroundColor: 'transparent' }}
+            aria-label="Verificar minha reserva"
+          >
+            <Search size={12} style={{ color: '#C9846B' }} />
+            Verificar reserva
+          </button>
         </div>
 
         {/* How it works — só aparece antes de qualquer escolha */}
@@ -461,6 +497,21 @@ export default function Home() {
           prefillName={firstClaim?.userName}
           prefillPhone={firstClaim?.phone}
           giftNumber={giftNumber}
+        />
+      )}
+
+      {showVerify && (
+        <VerifyModal
+          claims={claims}
+          giftList={giftList}
+          currentUserClaims={userClaims}
+          onRestore={(restored) => {
+            saveUserClaims(restored)
+            setUserClaims(restored)
+            setShowVerify(false)
+            addToast('success', `${restored.length} reserva${restored.length > 1 ? 's restauradas' : ' restaurada'} neste dispositivo!`)
+          }}
+          onClose={() => setShowVerify(false)}
         />
       )}
 
