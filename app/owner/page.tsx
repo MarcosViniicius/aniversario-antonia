@@ -260,17 +260,30 @@ function WhatsAppTab({ showToast }: { showToast: (t:'ok'|'err', m:string) => voi
 
 // ── Reservas Tab ──────────────────────────────────────────────────────────────
 function ReservasTab({ showToast }: { showToast: (t:'ok'|'err', m:string) => void }) {
-  const [claims,  setClaims]  = useState<Claims>({})
-  const [loading, setLoading] = useState(true)
+  const [claims,   setClaims]   = useState<Claims>({})
+  const [logs,     setLogs]     = useState<WaLog[]>([])
+  const [loading,  setLoading]  = useState(true)
   const [removing, setRemoving] = useState<string | null>(null)
+  const [resending, setResending] = useState<string | null>(null)
 
-  const fetchClaims = useCallback(async () => {
-    const res = await fetch('/api/gifts').catch(() => null)
-    if (res?.ok) setClaims(await res.json())
+  const fetchAll = useCallback(async () => {
+    const [claimsRes, logsRes] = await Promise.all([
+      fetch('/api/gifts').catch(() => null),
+      fetch('/api/owner/whatsapp?action=logs').catch(() => null),
+    ])
+    if (claimsRes?.ok) setClaims(await claimsRes.json())
+    if (logsRes?.ok)   setLogs(await logsRes.json())
     setLoading(false)
   }, [])
 
-  useEffect(() => { fetchClaims() }, [fetchClaims])
+  useEffect(() => { fetchAll() }, [fetchAll])
+
+  // Latest log per claim: key = `${gift_id}-${claimed_by}`
+  const logMap = logs.reduce<Record<string, WaLog>>((acc, log) => {
+    const k = `${log.gift_id}-${log.claimed_by}`
+    if (!acc[k] || log.sent_at > acc[k].sent_at) acc[k] = log
+    return acc
+  }, {})
 
   const handleRemove = async (giftId: number, claimedBy: string) => {
     const key = `${giftId}-${claimedBy}`
@@ -288,6 +301,25 @@ function ReservasTab({ showToast }: { showToast: (t:'ok'|'err', m:string) => voi
     setRemoving(null)
   }
 
+  const handleResend = async (giftId: number, claimedBy: string) => {
+    const key = `${giftId}-${claimedBy}`
+    setResending(key)
+    const res = await fetch('/api/owner/resend', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ giftId, claimedBy }),
+    })
+    if (res.ok) {
+      showToast('ok', `Mensagem reenviada para ${claimedBy}.`)
+      // Refresh logs to show updated status
+      const logsRes = await fetch('/api/owner/whatsapp?action=logs').catch(() => null)
+      if (logsRes?.ok) setLogs(await logsRes.json())
+    } else {
+      const d = await res.json().catch(() => ({})) as { error?: string }
+      showToast('err', `Falha ao reenviar: ${d.error ?? 'erro desconhecido'}`)
+    }
+    setResending(null)
+  }
+
   const allClaims = staticGifts.flatMap(g =>
     (claims[String(g.id)] ?? []).map(c => ({ gift: g, claim: c }))
   )
@@ -295,8 +327,10 @@ function ReservasTab({ showToast }: { showToast: (t:'ok'|'err', m:string) => voi
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-sm font-bold" style={{ color: '#E8F0FE' }}>{allClaims.length} reserva{allClaims.length !== 1 ? 's' : ''}</h2>
-        <button onClick={fetchClaims} className="flex items-center gap-1 text-xs" style={{ color: '#4A90D9' }}>
+        <h2 className="text-sm font-bold" style={{ color: '#E8F0FE' }}>
+          {allClaims.length} reserva{allClaims.length !== 1 ? 's' : ''}
+        </h2>
+        <button onClick={fetchAll} className="flex items-center gap-1 text-xs" style={{ color: '#4A90D9' }}>
           <RefreshCw size={12} /> Atualizar
         </button>
       </div>
@@ -310,26 +344,82 @@ function ReservasTab({ showToast }: { showToast: (t:'ok'|'err', m:string) => voi
           {allClaims.map(({ gift, claim }) => {
             const cfg = categoryConfig[gift.category]
             const key = `${gift.id}-${claim.claimedBy}`
+            const log = logMap[key]
+
+            const statusBadge = log
+              ? log.status === 'sent'
+                ? { label: 'Enviado',  color: '#4CAF9A', bg: '#0D2820' }
+                : log.status === 'failed'
+                ? { label: 'Falhou',   color: '#FF6B6B', bg: '#2A1010' }
+                : { label: 'Pendente', color: '#F0B429', bg: '#2A2010' }
+              : { label: 'Não enviado', color: '#6A8098', bg: '#1A2530' }
+
+            const canResend = !log || log.status !== 'sent'
+
             return (
-              <div key={key} className="rounded-2xl p-4 flex items-start gap-4"
+              <div key={key} className="rounded-2xl p-4"
                 style={{ backgroundColor: '#162030', border: '1px solid #2A3A4A' }}>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold" style={{ color: '#E8F0FE' }}>{claim.claimedBy}</p>
-                  <p className="text-xs mt-0.5" style={{ color: cfg.color }}>{gift.name}</p>
-                  <a href={`https://wa.me/55${claim.phone.replace(/\D/g,'')}`} target="_blank" rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-xs mt-1 hover:underline" style={{ color: '#4CAF9A' }}>
-                    <Phone size={10} /> {claim.phone}
-                  </a>
-                  <p className="text-xs mt-1" style={{ color: '#4A6080' }}>{fmt(claim.claimedAt)}</p>
+                {/* Top row */}
+                <div className="flex items-start gap-3 mb-3">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold" style={{ color: '#E8F0FE' }}>{claim.claimedBy}</p>
+                    <p className="text-xs mt-0.5" style={{ color: cfg.color }}>{gift.name}</p>
+                    <a href={`https://wa.me/55${claim.phone.replace(/\D/g,'')}`} target="_blank" rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-xs mt-1 hover:underline" style={{ color: '#4CAF9A' }}>
+                      <Phone size={10} /> {claim.phone}
+                    </a>
+                    <p className="text-xs mt-0.5" style={{ color: '#4A6080' }}>{fmt(claim.claimedAt)}</p>
+                  </div>
+                  <button onClick={() => handleRemove(gift.id, claim.claimedBy)} disabled={removing === key}
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold flex-shrink-0"
+                    style={{ backgroundColor: '#1E1010', color: '#FF8080', border: '1px solid #5A2020' }}>
+                    {removing === key
+                      ? <span className="w-3 h-3 rounded-full border-2 border-red-400 border-t-transparent animate-spin" />
+                      : <Trash2 size={12} />}
+                  </button>
                 </div>
-                <button onClick={() => handleRemove(gift.id, claim.claimedBy)} disabled={removing === key}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold flex-shrink-0"
-                  style={{ backgroundColor: '#1E1010', color: '#FF8080', border: '1px solid #5A2020' }}>
-                  {removing === key
-                    ? <span className="w-3 h-3 rounded-full border-2 border-red-400 border-t-transparent animate-spin" />
-                    : <Trash2 size={12} />}
-                  Remover
-                </button>
+
+                {/* WhatsApp status row */}
+                <div className="flex items-center justify-between gap-2 pt-2.5"
+                  style={{ borderTop: '1px solid #1E2D3D' }}>
+                  <div className="flex items-center gap-2">
+                    <MessageSquare size={11} style={{ color: statusBadge.color }} />
+                    <span
+                      className="text-xs font-semibold px-2 py-0.5 rounded-full"
+                      style={{ color: statusBadge.color, backgroundColor: statusBadge.bg }}
+                    >
+                      {statusBadge.label}
+                    </span>
+                    {log && (
+                      <span className="text-xs" style={{ color: '#4A6080' }}>
+                        {fmt(log.sent_at)}
+                      </span>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => handleResend(gift.id, claim.claimedBy)}
+                    disabled={resending === key}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-opacity disabled:opacity-50"
+                    style={{
+                      backgroundColor: canResend ? '#0D2A1E' : '#0D2010',
+                      color:           canResend ? '#4CAF9A' : '#2D7A5A',
+                      border:          `1px solid ${canResend ? '#1A4A30' : '#1A3A28'}`,
+                    }}
+                  >
+                    {resending === key
+                      ? <span className="w-3 h-3 rounded-full border-2 border-green-400 border-t-transparent animate-spin" />
+                      : <Send size={11} />}
+                    {log?.status === 'sent' ? 'Reenviar' : 'Enviar'}
+                  </button>
+                </div>
+
+                {/* Error detail */}
+                {log?.status === 'failed' && log.error && (
+                  <p className="text-xs mt-2 px-2 py-1.5 rounded-lg break-all"
+                    style={{ backgroundColor: '#2A1010', color: '#FF8080' }}>
+                    {log.error}
+                  </p>
+                )}
               </div>
             )
           })}
