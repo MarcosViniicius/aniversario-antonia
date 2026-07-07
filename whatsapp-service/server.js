@@ -166,17 +166,25 @@ app.post('/send', async (req, res) => {
     return res.status(503).json({ error: 'WhatsApp not connected — scan the QR code first' })
   }
 
-  // Normalize → 55XXXXXXXXXXX@c.us
+  // Normalize → digits only (sem @c.us ainda)
   const digits     = String(phone).replace(/\D/g, '')
-  const normalized = (digits.startsWith('55') ? digits : '55' + digits) + '@c.us'
+  const normalized = digits.startsWith('55') ? digits : '55' + digits
 
   try {
+    // Resolve o LID do contato (sistema novo do WhatsApp, a partir de 2024).
+    // Sem isso, sendMessage lança "No LID for user".
+    const numberId = await waClient.getNumberId(normalized)
+    if (!numberId) {
+      console.warn('[WA] Número não encontrado no WhatsApp:', normalized)
+      return res.status(400).json({ error: `Número ${normalized} não encontrado no WhatsApp` })
+    }
+
     const sendTimeout = new Promise((_, reject) =>
       setTimeout(() => reject(new Error('sendMessage timeout')), 20_000)
     )
-    await Promise.race([waClient.sendMessage(normalized, message), sendTimeout])
-    console.log('[WA] Sent to', normalized)
-    res.json({ success: true, to: normalized })
+    await Promise.race([waClient.sendMessage(numberId._serialized, message), sendTimeout])
+    console.log('[WA] Sent to', numberId._serialized)
+    res.json({ success: true, to: numberId._serialized })
   } catch (err) {
     console.error('[WA] Send error:', err.message)
     if (err.message.includes('timeout')) {
