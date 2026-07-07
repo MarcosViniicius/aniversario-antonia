@@ -100,7 +100,7 @@ export default function GiftCard({ gift, claims, isMyGift, userClaimsCount, onCl
         {isMyGift && (
           <span className="ml-auto text-xs font-bold px-2 py-0.5 rounded-full"
             style={{ backgroundColor: '#4CAF9A', color: 'white' }}>
-            {isUnlimited ? 'Você contribui' : 'Seu presente'}
+            Seu presente
           </span>
         )}
         {isFull && !isMyGift && (
@@ -140,7 +140,7 @@ export default function GiftCard({ gift, claims, isMyGift, userClaimsCount, onCl
             <div className="flex items-center gap-1.5">
               <CheckCircle2 size={12} style={{ color: '#4CAF9A' }} />
               <span className="text-xs" style={{ color: '#2D8070' }}>
-                {claims.find(c => c.claimedBy)?.claimedBy ?? ''} está contribuindo
+                {claims.find(c => c.claimedBy)?.claimedBy ?? ''} já reservou
               </span>
             </div>
           ) : (
@@ -150,8 +150,8 @@ export default function GiftCard({ gift, claims, isMyGift, userClaimsCount, onCl
                 {userClaimsCount === 1
                   ? 'Adicionar como 2º presente'
                   : claims.length === 0
-                  ? 'Seja o primeiro a contribuir'
-                  : `${claims.length} contribuindo — participe também`}
+                  ? 'Seja o primeiro a reservar'
+                  : `${claims.length} já reservaram — participe!`}
               </span>
               {process.env.NEXT_PUBLIC_PIX_KEY ? (
                 <p className="text-xs mt-2 font-mono break-all" style={{ color: '#2D8070' }}>

@@ -30,7 +30,7 @@ const FILTER_OPTIONS: { value: Filter; label: string }[] = [
   { value: 'cozinha',    label: 'Cozinha'      },
   { value: 'calcados',   label: 'Calçados'     },
   { value: 'acessorios', label: 'Acessórios'   },
-  { value: 'pix',        label: 'Contribuição' },
+  { value: 'pix',        label: 'Pix'          },
 ]
 
 export default function Home() {

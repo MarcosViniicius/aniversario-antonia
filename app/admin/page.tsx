@@ -116,7 +116,7 @@ export default function AdminPage() {
     { label: 'Presentes disponíveis', value: regularGifts.length - claimedRegular.length, icon: Package,       color: '#C9846B', bg: '#FDF0EC' },
     { label: 'Presentes escolhidos',  value: claimedRegular.length,                       icon: CheckCircle2,  color: '#4CAF9A', bg: '#EDF7F5' },
     { label: 'Total de presentes',    value: regularGifts.length,                         icon: Gift,          color: '#C9A84C', bg: '#FDFAED' },
-    { label: 'Contribuições Pix',     value: pixContribs.length,                          icon: Users,         color: '#8B7BA8', bg: '#F4F0FA' },
+    { label: 'Reservas Pix',           value: pixContribs.length,                          icon: Users,         color: '#8B7BA8', bg: '#F4F0FA' },
   ]
 
   return (
@@ -265,7 +265,7 @@ export default function AdminPage() {
                         )}
                         <span className="text-xs" style={{ color: isFull ? '#2D8070' : isUnlimited ? cfg.color : '#B08070' }}>
                           {isUnlimited
-                            ? giftClaims.length === 0 ? 'Sem contribuições ainda' : `${giftClaims.length} contribuição(ões)`
+                            ? giftClaims.length === 0 ? 'Sem reservas ainda' : `${giftClaims.length} reserva(s)`
                             : isFull ? 'Escolhido' : 'Disponível'}
                         </span>
                       </div>

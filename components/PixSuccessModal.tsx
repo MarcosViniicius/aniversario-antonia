@@ -74,7 +74,7 @@ export default function PixSuccessModal({
               <div>
                 <h2 id="pix-success-title" className="font-playfair text-lg font-semibold"
                   style={{ color: '#3D2B1F' }}>
-                  Contribuição registrada!
+                  Presente confirmado!
                 </h2>
                 <p className="text-xs font-semibold" style={{ color: '#4CAF9A' }}>
                   Obrigada, {userName}! 💛
@@ -149,7 +149,7 @@ export default function PixSuccessModal({
                   Após pagar, envie o comprovante:
                 </p>
                 <a
-                  href={waLink(pix.pix_receipt_phone, `Olá! Segue o comprovante do Pix referente à contribuição "${gift.name}" para os 80 anos de Antônia Lucena. 🎂`)}
+                  href={waLink(pix.pix_receipt_phone, `Olá! Segue o comprovante do Pix referente ao presente "${gift.name}" para os 80 anos de Antônia Lucena. 🎂`)}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-2 w-full px-3 py-2.5 rounded-xl text-sm font-bold transition-all active:scale-95"

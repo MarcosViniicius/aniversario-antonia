@@ -54,7 +54,7 @@ export const categoryConfig: Record<GiftCategory, CategoryConfig> = {
     textColor: '#8B6E1A',
   },
   pix: {
-    label: 'Contribuição',
+    label: 'Pix',
     color: '#4CAF9A',
     bgColor: '#EDF7F5',
     borderColor: '#A8DDD5',

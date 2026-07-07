@@ -131,7 +131,7 @@ export default function ClaimModal({ gift, onClaim, onClose, prefillName = '', p
               </div>
               <div>
                 <h2 id="modal-title" className="font-playfair text-lg font-semibold" style={{ color: '#3D2B1F' }}>
-                  {giftNumber === 2 ? '2º presente' : isPix ? 'Contribuição Pix' : 'Escolher presente'}
+                  {giftNumber === 2 ? '2º presente' : 'Escolher presente'}
                 </h2>
                 <p className="text-xs" style={{ color: '#B08070' }}>
                   {hasPrefill ? 'Seus dados foram preenchidos automaticamente' : 'Preencha seus dados para reservar'}
@@ -206,7 +206,7 @@ export default function ClaimModal({ gift, onClaim, onClose, prefillName = '', p
                     Envie o comprovante para:
                   </p>
                   <a
-                    href={waLink(pixSettings.pix_receipt_phone, `Olá! Segue o comprovante do Pix referente à contribuição "${gift.name}" para os 80 anos de Antônia Lucena. 🎂`)}
+                    href={waLink(pixSettings.pix_receipt_phone, `Olá! Segue o comprovante do Pix referente ao presente "${gift.name}" para os 80 anos de Antônia Lucena. 🎂`)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center gap-2 w-full px-3 py-2.5 rounded-xl text-sm font-bold transition-all active:scale-95"
@@ -290,9 +290,7 @@ export default function ClaimModal({ gift, onClaim, onClose, prefillName = '', p
               </p>
             )}
             <p className="text-xs mb-5" style={{ color: '#B08070' }}>
-              {isPix
-                ? 'Usado para registrar sua contribuição e envio de confirmação.'
-                : 'Usado apenas para contato sobre o presente.'}
+              Usado apenas para contato sobre o presente.
             </p>
 
             <div className="flex gap-3">
@@ -313,7 +311,7 @@ export default function ClaimModal({ gift, onClaim, onClose, prefillName = '', p
                   boxShadow: canSubmit ? '0 4px 14px rgba(201,132,107,0.4)' : 'none',
                 }}
               >
-                {submitting ? 'Salvando...' : isPix ? 'Registrar contribuição' : 'Confirmar presente'}
+                {submitting ? 'Salvando...' : 'Confirmar presente'}
               </button>
             </div>
           </form>
