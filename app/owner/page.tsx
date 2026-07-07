@@ -275,7 +275,7 @@ function ReservasTab({ showToast }: { showToast: (t:'ok'|'err', m:string) => voi
   const handleRemove = async (giftId: number, claimedBy: string) => {
     const key = `${giftId}-${claimedBy}`
     setRemoving(key)
-    const res = await fetch('/api/admin/unclaim', {
+    const res = await fetch('/api/owner/unclaim', {
       method: 'DELETE', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ giftId, claimedBy }),
     })
