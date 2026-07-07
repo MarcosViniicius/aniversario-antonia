@@ -396,14 +396,16 @@ function ConfigTab({ showToast }: { showToast: (t:'ok'|'err', m:string) => void 
     setSaving(false)
   }
 
-  const fields: { key: string; label: string; placeholder: string; multiline?: boolean }[] = [
-    { key: 'pix_key',           label: 'Chave Pix',               placeholder: 'ex: (85) 99999-9999 ou CPF' },
-    { key: 'event_date',        label: 'Data do evento',           placeholder: '16 de Agosto de 2026' },
-    { key: 'event_time',        label: 'Horário',                  placeholder: '18h30' },
-    { key: 'event_place',       label: 'Local',                    placeholder: 'Buffet Diferentes Sabores' },
-    { key: 'rsvp_deadline',     label: 'Prazo de confirmação',     placeholder: '20 de julho de 2026' },
+  const fields: { key: string; label: string; placeholder: string; multiline?: boolean; section?: string }[] = [
+    { key: 'pix_key',           label: 'Chave Pix',                          placeholder: 'ex: (85) 99999-9999, CPF ou email', section: 'Configurações Pix' },
+    { key: 'pix_owner_name',    label: 'Nome do titular da chave',           placeholder: 'ex: Antônia Lucena' },
+    { key: 'pix_receipt_phone', label: 'Telefone para receber comprovante',  placeholder: 'ex: (85) 98765-4321' },
+    { key: 'event_date',        label: 'Data do evento',                     placeholder: '16 de Agosto de 2026', section: 'Evento' },
+    { key: 'event_time',        label: 'Horário',                            placeholder: '18h30' },
+    { key: 'event_place',       label: 'Local',                              placeholder: 'Buffet Diferentes Sabores' },
+    { key: 'rsvp_deadline',     label: 'Prazo de confirmação',               placeholder: '20 de julho de 2026' },
     { key: 'whatsapp_template', label: 'Template da mensagem WhatsApp',
-      placeholder: 'Ola {name}! Sua escolha de "{gift}" foi confirmada...', multiline: true },
+      placeholder: 'Ola {name}! Sua escolha de "{gift}" foi confirmada...', multiline: true, section: 'WhatsApp' },
   ]
 
   if (loading) return <p className="text-xs" style={{ color: '#8AA0B8' }}>Carregando...</p>
@@ -411,12 +413,17 @@ function ConfigTab({ showToast }: { showToast: (t:'ok'|'err', m:string) => void 
   return (
     <div>
       <p className="text-xs mb-5" style={{ color: '#8AA0B8' }}>
-        Variáveis disponíveis no template: <code style={{ color: '#4A90D9' }}>{'{name}'}</code>, <code style={{ color: '#4A90D9' }}>{'{gift}'}</code>, <code style={{ color: '#4A90D9' }}>{'{date}'}</code>, <code style={{ color: '#4A90D9' }}>{'{time}'}</code>, <code style={{ color: '#4A90D9' }}>{'{place}'}</code>
+        Variáveis disponíveis no template: <code style={{ color: '#4A90D9' }}>{'{name}'}</code>, <code style={{ color: '#4A90D9' }}>{'{gift}'}</code>, <code style={{ color: '#4A90D9' }}>{'{date}'}</code>, <code style={{ color: '#4A90D9' }}>{'{time}'}</code>, <code style={{ color: '#4A90D9' }}>{'{place}'}</code>, <code style={{ color: '#4A90D9' }}>{'{pix_key}'}</code>, <code style={{ color: '#4A90D9' }}>{'{pix_owner}'}</code>, <code style={{ color: '#4A90D9' }}>{'{pix_receipt}'}</code>
       </p>
 
       <div className="grid gap-4 mb-6">
-        {fields.map(({ key, label, placeholder, multiline }) => (
+        {fields.map(({ key, label, placeholder, multiline, section }) => (
           <div key={key}>
+            {section && (
+              <p className="text-xs font-bold uppercase tracking-widest mb-3 mt-2 pt-2" style={{ color: '#4A90D9', borderTop: '1px solid #2A3A4A' }}>
+                {section}
+              </p>
+            )}
             <label className="block text-xs font-semibold mb-1.5" style={{ color: '#C0D0E0' }}>{label}</label>
             {multiline ? (
               <textarea rows={3} value={settings[key] ?? ''} onChange={e => set(key, e.target.value)}

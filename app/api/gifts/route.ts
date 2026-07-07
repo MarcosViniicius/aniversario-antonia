@@ -93,25 +93,40 @@ async function sendWhatsApp({
 
   console.log(`[WA] send → gift=${giftId} phone=${phone} serviceUrl=${serviceUrl ?? '(não configurado)'}`)
 
+  const isPixGiftCategory = gifts.find(g => g.id === Number(giftId))?.category === 'pix'
+
   // Build message from template (DB setting, fallback to hardcoded)
   let template = 'Ola {name}! Sua escolha de "{gift}" para o aniversario de 80 anos de Antonia Lucena foi confirmada. Obrigada!'
   try {
     if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
-      const db   = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } })
-      const rows = await Promise.all([
-        db.from('app_settings').select('value').eq('key', 'whatsapp_template').single(),
-        db.from('app_settings').select('value').eq('key', 'event_date').single(),
-        db.from('app_settings').select('value').eq('key', 'event_time').single(),
-        db.from('app_settings').select('value').eq('key', 'event_place').single(),
-      ])
-      const [tmpl, date, time, place] = rows.map(r => r.data?.value ?? '')
-      if (tmpl) template = tmpl
+      const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } })
+      const { data: settingsData } = await db
+        .from('app_settings')
+        .select('key, value')
+        .in('key', ['whatsapp_template', 'event_date', 'event_time', 'event_place', 'pix_key', 'pix_owner_name', 'pix_receipt_phone'])
+
+      const s: Record<string, string> = {}
+      for (const row of settingsData ?? []) s[row.key] = row.value ?? ''
+
+      if (s.whatsapp_template) template = s.whatsapp_template
+
       template = template
-        .replace('{name}',  claimedBy)
-        .replace('{gift}',  giftName)
-        .replace('{date}',  date)
-        .replace('{time}',  time)
-        .replace('{place}', place)
+        .replace(/{name}/g,    claimedBy)
+        .replace(/{gift}/g,    giftName)
+        .replace(/{date}/g,    s.event_date   ?? '')
+        .replace(/{time}/g,    s.event_time   ?? '')
+        .replace(/{place}/g,   s.event_place  ?? '')
+        .replace(/{pix_key}/g,    s.pix_key          ?? '')
+        .replace(/{pix_owner}/g,  s.pix_owner_name   ?? '')
+        .replace(/{pix_receipt}/g, s.pix_receipt_phone ?? '')
+
+      // For PIX gifts: append PIX info if not already in template
+      const hasPixVars = template.includes(s.pix_key ?? '__none__')
+      if (isPixGiftCategory && s.pix_key && !hasPixVars) {
+        template += `\n\nChave Pix: ${s.pix_key}`
+        if (s.pix_owner_name)    template += ` (${s.pix_owner_name})`
+        if (s.pix_receipt_phone) template += `\nEnvie o comprovante para: ${s.pix_receipt_phone}`
+      }
     }
   } catch (err) {
     console.error('[WA] falha ao buscar template do Supabase:', err)
@@ -119,8 +134,8 @@ async function sendWhatsApp({
 
   // Fallback replacements if DB fetch failed
   template = template
-    .replace('{name}',  claimedBy)
-    .replace('{gift}',  giftName)
+    .replace(/{name}/g, claimedBy)
+    .replace(/{gift}/g, giftName)
 
   let status = 'sent'
   let error: string | null = null

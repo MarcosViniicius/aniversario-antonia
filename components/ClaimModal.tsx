@@ -1,11 +1,15 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { X, Gift, Phone, Copy, Check } from 'lucide-react'
+import { X, Gift, Phone, Copy, Check, MessageCircle, ExternalLink } from 'lucide-react'
 import { categoryConfig, type Gift as GiftType } from '@/lib/gifts-data'
 import { maskPhone, digitsOnly } from '@/lib/phone'
 
-const PIX_KEY = process.env.NEXT_PUBLIC_PIX_KEY ?? ''
+interface PixSettings {
+  pix_key?: string
+  pix_owner_name?: string
+  pix_receipt_phone?: string
+}
 
 interface Props {
   gift: GiftType
@@ -16,26 +20,36 @@ interface Props {
   giftNumber?: 1 | 2
 }
 
+function waReceiptLink(phone: string, giftName: string): string {
+  let d = phone.replace(/\D/g, '')
+  if (!d.startsWith('55')) d = '55' + d
+  const text = encodeURIComponent(
+    `Olá! Segue o comprovante do Pix referente à contribuição "${giftName}" para os 80 anos de Antônia Lucena. 🎂`
+  )
+  return `https://wa.me/${d}?text=${text}`
+}
+
 export default function ClaimModal({ gift, onClaim, onClose, prefillName = '', prefillPhone = '', giftNumber }: Props) {
-  const cfg      = categoryConfig[gift.category]
-  const isPix    = gift.category === 'pix'
+  const cfg       = categoryConfig[gift.category]
+  const isPix     = gift.category === 'pix'
   const hasPrefill = !!prefillName
+
   const [name,       setName]       = useState(prefillName)
   const [phone,      setPhone]      = useState(prefillPhone)
   const [phoneDirty, setPhoneDirty] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [copied,     setCopied]     = useState(false)
-  const nameRef  = useRef<HTMLInputElement>(null)
+  const [pixSettings, setPixSettings] = useState<PixSettings>({})
+  const nameRef = useRef<HTMLInputElement>(null)
 
-  const handleCopyPix = async () => {
-    try {
-      await navigator.clipboard.writeText(PIX_KEY)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2500)
-    } catch {
-      // clipboard not available
-    }
-  }
+  // Fetch PIX settings from server (only for PIX gifts)
+  useEffect(() => {
+    if (!isPix) return
+    fetch('/api/settings')
+      .then(r => r.ok ? r.json() : {})
+      .then((d: PixSettings) => setPixSettings(d))
+      .catch(() => {})
+  }, [isPix])
 
   useEffect(() => {
     const t = setTimeout(() => nameRef.current?.focus(), 80)
@@ -48,10 +62,19 @@ export default function ClaimModal({ gift, onClaim, onClose, prefillName = '', p
     return () => document.removeEventListener('keydown', handler)
   }, [onClose])
 
-  const phoneDigits   = digitsOnly(phone)
-  const phoneValid    = phoneDigits.length >= 10  // 10 = fixo, 11 = celular
-  const phoneError    = phoneDirty && !phoneValid
-  const canSubmit     = name.trim().length >= 2 && phoneValid
+  const handleCopyPix = async () => {
+    if (!pixSettings.pix_key) return
+    try {
+      await navigator.clipboard.writeText(pixSettings.pix_key)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2500)
+    } catch { /* clipboard not available */ }
+  }
+
+  const phoneDigits = digitsOnly(phone)
+  const phoneValid  = phoneDigits.length >= 10
+  const phoneError  = phoneDirty && !phoneValid
+  const canSubmit   = name.trim().length >= 2 && phoneValid
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setPhone(maskPhone(e.target.value))
@@ -93,8 +116,8 @@ export default function ClaimModal({ gift, onClaim, onClose, prefillName = '', p
       aria-labelledby="modal-title"
     >
       <div
-        className="w-full max-w-md rounded-3xl shadow-2xl animate-slide-up"
-        style={{ backgroundColor: '#FDF8F3' }}
+        className="w-full max-w-md rounded-3xl shadow-2xl animate-slide-up overflow-y-auto"
+        style={{ backgroundColor: '#FDF8F3', maxHeight: '92dvh' }}
       >
         {/* Handle bar (mobile) */}
         <div className="flex justify-center pt-3 sm:hidden">
@@ -116,7 +139,7 @@ export default function ClaimModal({ gift, onClaim, onClose, prefillName = '', p
               </div>
               <div>
                 <h2 id="modal-title" className="font-playfair text-lg font-semibold" style={{ color: '#3D2B1F' }}>
-                  {giftNumber === 2 ? '2º presente' : 'Escolher presente'}
+                  {giftNumber === 2 ? '2º presente' : isPix ? 'Contribuição Pix' : 'Escolher presente'}
                 </h2>
                 <p className="text-xs" style={{ color: '#B08070' }}>
                   {hasPrefill ? 'Seus dados foram preenchidos automaticamente' : 'Preencha seus dados para reservar'}
@@ -139,36 +162,85 @@ export default function ClaimModal({ gift, onClaim, onClose, prefillName = '', p
             {gift.brand && <p className="text-xs mt-1" style={{ color: cfg.color }}>{gift.brand}</p>}
           </div>
 
-          {/* PIX key — shown when NEXT_PUBLIC_PIX_KEY is set */}
-          {isPix && PIX_KEY && (
-            <div
-              className="rounded-xl p-3 mb-4 flex items-center justify-between gap-3"
-              style={{ backgroundColor: '#EDF7F5', border: '1.5px solid #A8DDD5' }}
-            >
-              <div className="min-w-0">
-                <p className="text-xs font-semibold mb-0.5" style={{ color: '#1A5A4A' }}>Chave Pix</p>
-                <p className="text-sm font-mono break-all" style={{ color: '#2D8070' }}>{PIX_KEY}</p>
-              </div>
-              <button
-                type="button"
-                onClick={handleCopyPix}
-                className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
-                style={{
-                  backgroundColor: copied ? '#4CAF9A' : 'white',
-                  color:           copied ? 'white' : '#2D8070',
-                  border:          `1px solid ${copied ? '#4CAF9A' : '#A8DDD5'}`,
-                }}
-                aria-label="Copiar chave Pix"
-              >
-                {copied ? <Check size={12} /> : <Copy size={12} />}
-                {copied ? 'Copiado!' : 'Copiar'}
-              </button>
+          {/* PIX block */}
+          {isPix && (
+            <div className="rounded-2xl mb-4 overflow-hidden" style={{ border: '1.5px solid #A8DDD5' }}>
+              {/* Chave PIX */}
+              {pixSettings.pix_key ? (
+                <div className="p-3" style={{ backgroundColor: '#EDF7F5' }}>
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold mb-0.5" style={{ color: '#1A5A4A' }}>
+                        Chave Pix
+                        {pixSettings.pix_owner_name && (
+                          <span className="ml-1.5 font-normal" style={{ color: '#4CAF9A' }}>
+                            · {pixSettings.pix_owner_name}
+                          </span>
+                        )}
+                      </p>
+                      <p className="text-sm font-mono break-all font-semibold" style={{ color: '#2D8070' }}>
+                        {pixSettings.pix_key}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleCopyPix}
+                      className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all active:scale-95"
+                      style={{
+                        backgroundColor: copied ? '#4CAF9A' : 'white',
+                        color:           copied ? 'white'    : '#2D8070',
+                        border:          `1px solid ${copied ? '#4CAF9A' : '#A8DDD5'}`,
+                        boxShadow:       copied ? 'none' : '0 1px 4px rgba(0,0,0,0.08)',
+                      }}
+                      aria-label="Copiar chave Pix"
+                    >
+                      {copied ? <Check size={12} /> : <Copy size={12} />}
+                      {copied ? 'Copiado!' : 'Copiar'}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-3" style={{ backgroundColor: '#EDF7F5' }}>
+                  <p className="text-xs" style={{ color: '#7ABFB5' }}>
+                    A chave Pix será informada no evento.
+                  </p>
+                </div>
+              )}
+
+              {/* Comprovante */}
+              {pixSettings.pix_receipt_phone && (
+                <div className="p-3 border-t" style={{ borderColor: '#A8DDD5', backgroundColor: 'white' }}>
+                  <p className="text-xs font-semibold mb-2" style={{ color: '#3D2B1F' }}>
+                    Envie o comprovante para:
+                  </p>
+                  <a
+                    href={waReceiptLink(pixSettings.pix_receipt_phone, gift.name)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 w-full px-3 py-2.5 rounded-xl text-sm font-bold transition-all active:scale-95"
+                    style={{
+                      backgroundColor: '#25D366',
+                      color: 'white',
+                      boxShadow: '0 2px 10px rgba(37,211,102,0.35)',
+                      textDecoration: 'none',
+                    }}
+                  >
+                    <MessageCircle size={15} />
+                    <span className="flex-1">
+                      {pixSettings.pix_receipt_phone}
+                    </span>
+                    <ExternalLink size={12} style={{ opacity: 0.8 }} />
+                  </a>
+                  <p className="text-xs mt-2 text-center" style={{ color: '#B08070' }}>
+                    Clique para abrir o WhatsApp e enviar o comprovante
+                  </p>
+                </div>
+              )}
             </div>
           )}
 
           {/* Form */}
           <form onSubmit={handleSubmit} noValidate>
-            {/* Name */}
             <label htmlFor="userName" className="block text-sm font-semibold mb-1.5" style={{ color: '#3D2B1F' }}>
               Seu nome <span style={{ color: '#C9846B' }}>*</span>
             </label>
@@ -189,7 +261,6 @@ export default function ClaimModal({ gift, onClaim, onClose, prefillName = '', p
               onBlur={e  => onBlur(e,  false)}
             />
 
-            {/* Phone */}
             <label htmlFor="userPhone" className="block text-sm font-semibold mb-1.5" style={{ color: '#3D2B1F' }}>
               Seu telefone / WhatsApp <span style={{ color: '#C9846B' }}>*</span>
             </label>
@@ -221,7 +292,9 @@ export default function ClaimModal({ gift, onClaim, onClose, prefillName = '', p
               </p>
             )}
             <p className="text-xs mb-5" style={{ color: '#B08070' }}>
-              Usado apenas para contato sobre o presente.
+              {isPix
+                ? 'Usado para registrar sua contribuição e envio de confirmação.'
+                : 'Usado apenas para contato sobre o presente.'}
             </p>
 
             <div className="flex gap-3">
@@ -242,7 +315,7 @@ export default function ClaimModal({ gift, onClaim, onClose, prefillName = '', p
                   boxShadow: canSubmit ? '0 4px 14px rgba(201,132,107,0.4)' : 'none',
                 }}
               >
-                {submitting ? 'Salvando...' : 'Confirmar presente'}
+                {submitting ? 'Salvando...' : isPix ? 'Registrar contribuição' : 'Confirmar presente'}
               </button>
             </div>
           </form>
