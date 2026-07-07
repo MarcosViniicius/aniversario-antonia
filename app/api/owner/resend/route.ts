@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { verifyToken } from '@/lib/owner-auth'
 import { createClient } from '@supabase/supabase-js'
-import { gifts } from '@/lib/gifts-data'
+import { getGifts } from '@/lib/gifts-db'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -15,7 +15,7 @@ function db() {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false } },
+    { auth: { persistSession: false }, global: { fetch: (i, o) => fetch(i, { ...o, cache: 'no-store' }) } },
   )
 }
 
@@ -43,6 +43,7 @@ export async function POST(request: NextRequest) {
   }
 
   const phone    = claimRow.phone as string
+  const gifts    = await getGifts()
   const gift     = gifts.find(g => g.id === giftId)
   const giftName = gift?.name ?? `Presente #${giftId}`
   const isPix    = gift?.category === 'pix'

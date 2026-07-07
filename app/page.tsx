@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Calendar, Clock, MapPin, Gift, Heart, CheckCircle2, X, Search } from 'lucide-react'
 import { gifts as staticGifts, categoryConfig, type GiftCategory, type Gift as GiftType } from '@/lib/gifts-data'
-import { getUserClaims, saveUserClaims, clearUserClaims, type UserClaim } from '@/lib/storage'
+import { getUserClaims, saveUserClaims, type UserClaim } from '@/lib/storage'
 import { phoneMatch } from '@/lib/phone'
 import GiftCard from '@/components/GiftCard'
 import ClaimModal from '@/components/ClaimModal'
@@ -34,7 +34,8 @@ const FILTER_OPTIONS: { value: Filter; label: string }[] = [
 ]
 
 export default function Home() {
-  const [giftList,    setGiftList]    = useState<GiftType[]>(staticGifts)
+  const [giftList,    setGiftList]    = useState<GiftType[]>([])
+  const [giftsReady,  setGiftsReady]  = useState(false)
   const [claims,      setClaims]      = useState<Claims>({})
   const [loading,     setLoading]     = useState(true)
   const [selectedId,  setSelectedId]  = useState<number | null>(null)
@@ -67,10 +68,13 @@ export default function Home() {
   }, [])
 
   useEffect(() => {
-    fetch('/api/gifts-catalog')
+    fetch('/api/gifts-catalog', { cache: 'no-store' })
       .then(r => r.ok ? r.json() : null)
-      .then((data: GiftType[] | null) => { if (Array.isArray(data) && data.length > 0) setGiftList(data) })
-      .catch(() => {})
+      .then((data: GiftType[] | null) => {
+        setGiftList(Array.isArray(data) && data.length > 0 ? data : staticGifts)
+      })
+      .catch(() => setGiftList(staticGifts))
+      .finally(() => setGiftsReady(true))
   }, [])
 
   useEffect(() => {
@@ -335,7 +339,7 @@ export default function Home() {
       <div className="max-w-4xl mx-auto px-4 py-6">
 
         {/* ── Painel de presentes escolhidos ───────────────────────────────── */}
-        {userClaims.length > 0 && !loading && (
+        {userClaims.length > 0 && !loading && giftsReady && (
           <div
             className="rounded-2xl p-4 mb-6 shadow-sm animate-fade-in"
             style={{ backgroundColor: '#EDF7F5', border: '1.5px solid #A8DDD5' }}
@@ -446,7 +450,7 @@ export default function Home() {
         </div>
 
         {/* How it works — só aparece antes de qualquer escolha */}
-        {userClaims.length === 0 && !loading && (
+        {userClaims.length === 0 && !loading && giftsReady && (
           <div
             className="rounded-2xl p-4 mb-5 grid grid-cols-3 gap-3"
             style={{ backgroundColor: 'white', border: '1px solid #F0E4DE' }}
@@ -494,7 +498,7 @@ export default function Home() {
         </div>
 
         {/* Gift grid */}
-        {loading ? (
+        {loading || !giftsReady ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {Array.from({ length: 9 }).map((_, i) => (
               <div key={i} className="skeleton h-36" />
@@ -520,7 +524,7 @@ export default function Home() {
         )}
 
         {/* Legend */}
-        {!loading && (
+        {!loading && giftsReady && (
           <div className="mt-8 flex flex-wrap items-center justify-center gap-5">
             {[
               { color: '#C9846B', label: 'Disponível'   },
@@ -547,7 +551,7 @@ export default function Home() {
           <Heart size={10} style={{ color: '#DBBAA8' }} />
         </div>
         <p className="text-xs" style={{ color: '#D4B8A8' }}>
-          dev por{' '}
+          desenvolvido por{' '}
           <a href="https://www.linkedin.com/in/marcosvinicius1/" target="_blank" rel="noopener noreferrer"
             className="hover:underline transition-opacity hover:opacity-70" style={{ color: '#C0A090' }}>
             LinkedIn

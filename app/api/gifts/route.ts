@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { gifts } from '@/lib/gifts-data'
+import { getGifts } from '@/lib/gifts-db'
 import { readClaims, countClaims, insertClaim, deleteClaim } from '@/lib/claims'
 import { createClient } from '@supabase/supabase-js'
 
@@ -29,7 +29,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'giftId, claimedBy e phone são obrigatórios' }, { status: 400 })
   }
 
-  const gift = gifts.find(g => g.id === Number(giftId))
+  const gifts = await getGifts()
+  const gift  = gifts.find(g => g.id === Number(giftId))
   if (!gift) {
     return NextResponse.json({ error: 'Presente não encontrado' }, { status: 404 })
   }
@@ -53,7 +54,7 @@ export async function POST(request: NextRequest) {
   }
 
   // Send WhatsApp confirmation (fire-and-forget — never blocks the response)
-  sendWhatsApp({ giftId, giftName: gift.name, claimedBy, phone }).catch(
+  sendWhatsApp({ giftId, giftName: gift.name, isPix: gift.category === 'pix', claimedBy, phone }).catch(
     err => console.error('[WA] send failed:', err)
   )
 
@@ -86,16 +87,13 @@ export async function DELETE(request: NextRequest) {
 
 // ── WhatsApp helper ───────────────────────────────────────────────────────────
 async function sendWhatsApp({
-  giftId, giftName, claimedBy, phone,
-}: { giftId: string; giftName: string; claimedBy: string; phone: string }) {
+  giftId, giftName, isPix, claimedBy, phone,
+}: { giftId: string; giftName: string; isPix: boolean; claimedBy: string; phone: string }) {
   const serviceUrl = (process.env.WHATSAPP_SERVICE_URL ?? '').replace(/\/+$/, '') || undefined
   const serviceKey = process.env.WHATSAPP_SERVICE_KEY ?? ''
 
   console.log(`[WA] send → gift=${giftId} phone=${phone} serviceUrl=${serviceUrl ?? '(não configurado)'}`)
 
-  const isPixGiftCategory = gifts.find(g => g.id === Number(giftId))?.category === 'pix'
-
-  // Build message from template (DB setting, fallback to hardcoded)
   let template = `🎊 *{name}, sua reserva está confirmada!* ✅
 
 Que alegria contar com sua presença na celebração dos *80 anos de Antônia Lucena*! 🎂
@@ -112,9 +110,10 @@ Que alegria contar com sua presença na celebração dos *80 anos de Antônia Lu
 ━━━━━━━━━━━━━━━━━━
 
 Te esperamos com muito carinho! 💛`
+
   try {
     if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
-      const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } })
+      const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false }, global: { fetch: (i, o) => fetch(i, { ...o, cache: 'no-store' }) } })
       const { data: settingsData } = await db
         .from('app_settings')
         .select('key, value')
@@ -126,18 +125,17 @@ Te esperamos com muito carinho! 💛`
       if (s.whatsapp_template) template = s.whatsapp_template
 
       template = template
-        .replace(/{name}/g,    claimedBy)
-        .replace(/{gift}/g,    giftName)
-        .replace(/{date}/g,    s.event_date   ?? '')
-        .replace(/{time}/g,    s.event_time   ?? '')
-        .replace(/{place}/g,   s.event_place  ?? '')
-        .replace(/{pix_key}/g,    s.pix_key          ?? '')
-        .replace(/{pix_owner}/g,  s.pix_owner_name   ?? '')
-        .replace(/{pix_receipt}/g, s.pix_receipt_phone ?? '')
+        .replace(/{name}/g,        claimedBy)
+        .replace(/{gift}/g,        giftName)
+        .replace(/{date}/g,        s.event_date         ?? '')
+        .replace(/{time}/g,        s.event_time         ?? '')
+        .replace(/{place}/g,       s.event_place        ?? '')
+        .replace(/{pix_key}/g,     s.pix_key            ?? '')
+        .replace(/{pix_owner}/g,   s.pix_owner_name     ?? '')
+        .replace(/{pix_receipt}/g, s.pix_receipt_phone  ?? '')
 
-      // Para presentes PIX: appenda bloco PIX se não estiver no template
       const hasPixInTemplate = s.pix_key ? template.includes(s.pix_key) : false
-      if (isPixGiftCategory && s.pix_key && !hasPixInTemplate) {
+      if (isPix && s.pix_key && !hasPixInTemplate) {
         template += `\n\n━━━━━━━━━━━━━━━━━━\n💳 *Dados para o Pix*\n🔑  ${s.pix_key}`
         if (s.pix_owner_name)    template += ` — _${s.pix_owner_name}_`
         if (s.pix_receipt_phone) template += `\n📲  Comprovante: ${s.pix_receipt_phone}`
@@ -178,9 +176,8 @@ Te esperamos com muito carinho! 💛`
     console.warn('[WA] WHATSAPP_SERVICE_URL não configurada — mensagem não enviada')
   }
 
-  // Log to Supabase (best-effort)
   if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } })
+    const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false }, global: { fetch: (i, o) => fetch(i, { ...o, cache: 'no-store' }) } })
     const { error: dbErr } = await db.from('whatsapp_logs').insert({ gift_id: Number(giftId), claimed_by: claimedBy, phone, message: template, status, error })
     if (dbErr) console.error('[WA] falha ao gravar log no Supabase:', dbErr.message)
   } else {
