@@ -140,7 +140,7 @@ export default function GiftCard({ gift, claims, isMyGift, userClaimsCount, onCl
             <div className="flex items-center gap-1.5">
               <CheckCircle2 size={12} style={{ color: '#4CAF9A' }} />
               <span className="text-xs" style={{ color: '#2D8070' }}>
-                {claims.find(c => c.claimedBy)?.claimedBy ?? ''} já reservou
+                Reserva confirmada
               </span>
             </div>
           ) : (
@@ -169,7 +169,7 @@ export default function GiftCard({ gift, claims, isMyGift, userClaimsCount, onCl
         <div className="flex items-center gap-1.5 mt-auto">
           <CheckCircle2 size={12} style={{ color: isMyGift ? '#4CAF9A' : '#C0A898' }} />
           <span className="text-xs" style={{ color: isMyGift ? '#2D8070' : '#A08070' }}>
-            {claims[0]?.claimedBy}
+            {isMyGift ? 'Seu presente' : 'Já escolhido'}
           </span>
         </div>
       ) : (
