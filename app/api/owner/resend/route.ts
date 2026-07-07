@@ -114,9 +114,10 @@ export async function POST(request: NextRequest) {
   }
 
   // Log to Supabase
-  await db().from('whatsapp_logs').insert({
+  const { error: logErr } = await db().from('whatsapp_logs').insert({
     gift_id: giftId, claimed_by: claimedBy, phone, message: template, status, error,
-  }).catch(e => console.error('[resend] log error:', e))
+  })
+  if (logErr) console.error('[resend] log error:', logErr.message)
 
   if (status === 'failed') {
     return NextResponse.json({ error: error ?? 'Falha no envio' }, { status: 502 })
