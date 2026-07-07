@@ -264,18 +264,46 @@ export default function Home() {
               </span>
             </p>
 
-            {/* Mapa */}
-            <div className="mt-5 overflow-hidden rounded-2xl shadow-sm" style={{ border: '1.5px solid #E8C8BA' }}>
-              <iframe
-                src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3968.7562724831896!2d-35.25448968851259!3d-5.88982789406941!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x7b257fa68cf98e3%3A0xb1eaeb15beb274f2!2sDiferentes%20Sabores!5e0!3m2!1spt-BR!2sbr!4v1783391464329!5m2!1spt-BR!2sbr"
-                width="100%"
-                height="180"
-                style={{ border: 0, display: 'block' }}
-                allowFullScreen
-                loading="lazy"
-                referrerPolicy="strict-origin-when-cross-origin"
-                title="Localização — Buffet Diferentes Sabores"
-              />
+            {/* Mapa — iframe no desktop, card clicável no mobile */}
+            <div className="mt-5">
+              {/* Mobile: card que abre o app Maps */}
+              <a
+                href="https://maps.app.goo.gl/1SQhCcoGbJZSMuaM6"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="sm:hidden flex items-center gap-4 p-4 rounded-2xl active:scale-98 transition-transform"
+                style={{ backgroundColor: 'white', border: '1.5px solid #E8C8BA', textDecoration: 'none' }}
+              >
+                <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0"
+                  style={{ background: 'linear-gradient(135deg, #F2E0D8, #EAC5B8)' }}>
+                  <MapPin size={20} style={{ color: '#C9846B' }} />
+                </div>
+                <div className="flex-1 text-left min-w-0">
+                  <p className="text-sm font-bold leading-tight" style={{ color: '#3D2B1F' }}>
+                    Buffet Diferentes Sabores
+                  </p>
+                  <p className="text-xs mt-0.5" style={{ color: '#B08070' }}>
+                    Toque para abrir no Maps
+                  </p>
+                </div>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#C9846B" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
+                </svg>
+              </a>
+
+              {/* Desktop: iframe embed */}
+              <div className="hidden sm:block overflow-hidden rounded-2xl shadow-sm" style={{ border: '1.5px solid #E8C8BA' }}>
+                <iframe
+                  src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3968.7562724831896!2d-35.25448968851259!3d-5.88982789406941!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x7b257fa68cf98e3%3A0xb1eaeb15beb274f2!2sDiferentes%20Sabores!5e0!3m2!1spt-BR!2sbr!4v1783391464329!5m2!1spt-BR!2sbr"
+                  width="100%"
+                  height="180"
+                  style={{ border: 0, display: 'block' }}
+                  allowFullScreen
+                  loading="lazy"
+                  referrerPolicy="strict-origin-when-cross-origin"
+                  title="Localização — Buffet Diferentes Sabores"
+                />
+              </div>
             </div>
 
             <div className="flex items-center justify-center gap-3 mt-5">
