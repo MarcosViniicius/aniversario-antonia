@@ -436,7 +436,7 @@ function PresentesTab({ showToast }: { showToast: (t:'ok'|'err', m:string) => vo
   return (
     <div>
       <p className="text-xs mb-4" style={{ color: '#8AA0B8' }}>
-        Lista atual (16 presentes). Para editar, altere o arquivo <code style={{ color: '#4A90D9' }}>lib/gifts-data.ts</code> ou migre para a tabela Supabase.
+        Os presentes são carregados da tabela <code style={{ color: '#4A90D9' }}>gifts</code> no Supabase. Para editar, acesse o banco de dados diretamente.
       </p>
       <div className="grid gap-2">
         {staticGifts.map(g => {
