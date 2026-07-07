@@ -264,7 +264,21 @@ export default function Home() {
               </span>
             </p>
 
-            <div className="flex items-center justify-center gap-3 mt-6">
+            {/* Mapa */}
+            <div className="mt-5 overflow-hidden rounded-2xl shadow-sm" style={{ border: '1.5px solid #E8C8BA' }}>
+              <iframe
+                src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3968.7562724831896!2d-35.25448968851259!3d-5.88982789406941!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x7b257fa68cf98e3%3A0xb1eaeb15beb274f2!2sDiferentes%20Sabores!5e0!3m2!1spt-BR!2sbr!4v1783391464329!5m2!1spt-BR!2sbr"
+                width="100%"
+                height="180"
+                style={{ border: 0, display: 'block' }}
+                allowFullScreen
+                loading="lazy"
+                referrerPolicy="strict-origin-when-cross-origin"
+                title="Localização — Buffet Diferentes Sabores"
+              />
+            </div>
+
+            <div className="flex items-center justify-center gap-3 mt-5">
               <div style={{ height: 1, width: 56, background: 'linear-gradient(to right, transparent, #C9A84C)' }} />
               <span style={{ color: '#C9A84C', fontSize: 18, lineHeight: 1 }}>✦</span>
               <div style={{ height: 1, width: 56, background: 'linear-gradient(to left, transparent, #C9A84C)' }} />
