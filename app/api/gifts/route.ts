@@ -103,6 +103,7 @@ Sua escolha de *"{gift}"* foi registrada com sucesso para o aniversário de *80 
 📅 *Data:* {date}
 ⏰ *Horário:* {time}
 📍 *Local:* {place}
+🗺️ https://maps.app.goo.gl/1SQhCcoGbJZSMuaM6
 
 Te esperamos com muito carinho! 💛`
   try {
