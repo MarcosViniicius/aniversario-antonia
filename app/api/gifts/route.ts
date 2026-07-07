@@ -113,7 +113,7 @@ Te esperamos com muito carinho! 💛`
 
   try {
     if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
-      const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } })
+      const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false }, global: { fetch: (i, o) => fetch(i, { ...o, cache: 'no-store' }) } })
       const { data: settingsData } = await db
         .from('app_settings')
         .select('key, value')
@@ -177,7 +177,7 @@ Te esperamos com muito carinho! 💛`
   }
 
   if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } })
+    const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false }, global: { fetch: (i, o) => fetch(i, { ...o, cache: 'no-store' }) } })
     const { error: dbErr } = await db.from('whatsapp_logs').insert({ gift_id: Number(giftId), claimed_by: claimedBy, phone, message: template, status, error })
     if (dbErr) console.error('[WA] falha ao gravar log no Supabase:', dbErr.message)
   } else {
