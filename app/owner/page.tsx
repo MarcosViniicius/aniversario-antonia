@@ -5,9 +5,10 @@ import { useRouter } from 'next/navigation'
 import {
   LogOut, RefreshCw, Settings, MessageSquare, Gift,
   Users, CheckCircle2, XCircle, Clock, Wifi, WifiOff,
-  QrCode, Send, Save, Trash2, Phone,
+  QrCode, Send, Save, Trash2, Phone, AlertCircle,
 } from 'lucide-react'
-import { gifts as staticGifts, categoryConfig } from '@/lib/gifts-data'
+import { categoryConfig } from '@/lib/gifts-data'
+import type { Gift as GiftType } from '@/lib/gifts-data'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface WaLog {
@@ -16,28 +17,61 @@ interface WaLog {
 }
 interface WaStatus { connected: boolean; phone: string | null; hasQR: boolean }
 interface ClaimRecord { claimedBy: string; phone: string; claimedAt: string }
-type Claims = Record<string, ClaimRecord[]>
+type Claims     = Record<string, ClaimRecord[]>
 type AppSettings = Record<string, string>
 
 const TABS = [
-  { id: 'whatsapp',  label: 'WhatsApp',    icon: MessageSquare },
-  { id: 'reservas',  label: 'Reservas',    icon: Users         },
-  { id: 'presentes', label: 'Presentes',   icon: Gift          },
-  { id: 'config',    label: 'Configurações', icon: Settings    },
+  { id: 'reservas',  label: 'Reservas',  icon: Users         },
+  { id: 'whatsapp',  label: 'WhatsApp',  icon: MessageSquare },
+  { id: 'presentes', label: 'Presentes', icon: Gift          },
+  { id: 'config',    label: 'Config',    icon: Settings      },
 ] as const
 type TabId = typeof TABS[number]['id']
 
 function fmt(iso: string) {
-  return new Date(iso).toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', year:'2-digit', hour:'2-digit', minute:'2-digit' })
+  return new Date(iso).toLocaleString('pt-BR', {
+    day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit',
+  })
+}
+
+// ── Shared components ─────────────────────────────────────────────────────────
+function StatCard({ label, value, sub, color = '#4A90D9' }: { label: string; value: number; sub?: string; color?: string }) {
+  return (
+    <div className="rounded-2xl p-4 flex-1" style={{ backgroundColor: '#162030', border: '1px solid #1E3045' }}>
+      <p className="text-xs font-medium mb-1" style={{ color: '#5A7898' }}>{label}</p>
+      <p className="text-2xl font-bold" style={{ color }}>{value}</p>
+      {sub && <p className="text-xs mt-0.5" style={{ color: '#2A4060' }}>{sub}</p>}
+    </div>
+  )
+}
+
+function SectionDivider({ title, action }: { title: string; action?: React.ReactNode }) {
+  return (
+    <div className="flex items-center gap-3 mb-4">
+      <p className="text-xs font-bold uppercase tracking-widest flex-shrink-0" style={{ color: '#4A90D9' }}>{title}</p>
+      <div className="flex-1 h-px" style={{ backgroundColor: '#1E3045' }} />
+      {action}
+    </div>
+  )
+}
+
+function Skeleton({ rows = 3 }: { rows?: number }) {
+  return (
+    <div className="flex flex-col gap-3">
+      {Array.from({ length: rows }).map((_, i) => (
+        <div key={i} className="h-20 rounded-2xl animate-pulse" style={{ backgroundColor: '#162030' }} />
+      ))}
+    </div>
+  )
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function OwnerPage() {
   const router = useRouter()
-  const [tab,      setTab]      = useState<TabId>('whatsapp')
-  const [toast,    setToast]    = useState<{ type: 'ok'|'err'; msg: string } | null>(null)
+  const [tab,   setTab]   = useState<TabId>('reservas')
+  const [toast, setToast] = useState<{ type: 'ok' | 'err'; msg: string } | null>(null)
 
-  const showToast = useCallback((type: 'ok'|'err', msg: string) => {
+  const showToast = useCallback((type: 'ok' | 'err', msg: string) => {
     setToast({ type, msg })
     setTimeout(() => setToast(null), 4000)
   }, [])
@@ -48,58 +82,67 @@ export default function OwnerPage() {
   }
 
   return (
-    <main className="min-h-screen" style={{ backgroundColor: '#0F1923' }}>
+    <main className="min-h-screen" style={{ backgroundColor: '#0A1520' }}>
       {/* Header */}
-      <header className="sticky top-0 z-10 border-b" style={{ backgroundColor: '#162030', borderColor: '#2A3A4A' }}>
-        <div className="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-xl flex items-center justify-center"
-              style={{ background: 'linear-gradient(135deg, #4A90D9, #357ABD)' }}>
-              <Settings size={15} color="white" />
+      <header className="sticky top-0 z-20 border-b" style={{ backgroundColor: '#0F1D2B', borderColor: '#1E3045' }}>
+        <div className="max-w-4xl mx-auto px-4">
+          <div className="h-14 flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
+                style={{ background: 'linear-gradient(135deg, #4A90D9, #2563EB)' }}>
+                <Settings size={14} color="white" />
+              </div>
+              <div>
+                <p className="text-sm font-bold leading-none" style={{ color: '#E2EEFF' }}>Painel Admin</p>
+                <p className="text-xs mt-0.5" style={{ color: '#4A6080' }}>Antônia · 80 Anos</p>
+              </div>
             </div>
-            <div>
-              <p className="text-sm font-bold" style={{ color: '#E8F0FE' }}>Painel Owner</p>
-              <p className="text-xs hidden sm:block" style={{ color: '#8AA0B8' }}>Antônia Lucena — 80 Anos</p>
-            </div>
-          </div>
-          <button onClick={handleLogout}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold"
-            style={{ color: '#FF8080', border: '1px solid #5A2020', backgroundColor: '#1E1010' }}>
-            <LogOut size={13} /><span className="hidden sm:inline">Sair</span>
-          </button>
-        </div>
-
-        {/* Tab bar */}
-        <div className="max-w-5xl mx-auto px-4 flex gap-1 pb-0">
-          {TABS.map(({ id, label, icon: Icon }) => (
-            <button key={id} onClick={() => setTab(id)}
-              className="flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold border-b-2 transition-colors"
-              style={{
-                borderColor:     tab === id ? '#4A90D9' : 'transparent',
-                color:           tab === id ? '#4A90D9' : '#8AA0B8',
-                backgroundColor: 'transparent',
-              }}>
-              <Icon size={13} /><span className="hidden sm:inline">{label}</span>
+            <button onClick={handleLogout}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-opacity hover:opacity-80"
+              style={{ color: '#F87171', border: '1px solid #3D1515', backgroundColor: '#1A0A0A' }}>
+              <LogOut size={12} /> Sair
             </button>
-          ))}
+          </div>
+
+          {/* Tab bar — scrollable on mobile */}
+          <div className="flex overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
+            {TABS.map(({ id, label, icon: Icon }) => {
+              const active = tab === id
+              return (
+                <button key={id} onClick={() => setTab(id)}
+                  className="flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold whitespace-nowrap border-b-2 transition-colors flex-shrink-0"
+                  style={{
+                    borderColor:     active ? '#4A90D9' : 'transparent',
+                    color:           active ? '#4A90D9' : '#4A6080',
+                    backgroundColor: 'transparent',
+                  }}>
+                  <Icon size={12} /> {label}
+                </button>
+              )
+            })}
+          </div>
         </div>
       </header>
 
-      <div className="max-w-5xl mx-auto px-4 py-6">
-        {tab === 'whatsapp'  && <WhatsAppTab showToast={showToast} />}
-        {tab === 'reservas'  && <ReservasTab showToast={showToast} />}
+      <div className="max-w-4xl mx-auto px-4 py-6">
+        {tab === 'reservas'  && <ReservasTab  showToast={showToast} />}
+        {tab === 'whatsapp'  && <WhatsAppTab  showToast={showToast} />}
         {tab === 'presentes' && <PresentesTab showToast={showToast} />}
-        {tab === 'config'    && <ConfigTab   showToast={showToast} />}
+        {tab === 'config'    && <ConfigTab    showToast={showToast} />}
       </div>
 
+      {/* Toast */}
       {toast && (
-        <div className="fixed bottom-5 right-4 left-4 sm:left-auto sm:w-80 z-50 p-4 rounded-2xl shadow-lg text-sm font-semibold"
-          role="alert"
+        <div role="alert" aria-live="polite"
+          className="fixed bottom-5 left-4 right-4 sm:left-auto sm:right-5 sm:w-72 z-50 px-4 py-3 rounded-xl shadow-xl text-sm font-semibold flex items-center gap-2"
           style={{
-            backgroundColor: toast.type === 'ok' ? '#0A2A1A' : '#2A0A0A',
-            border:          toast.type === 'ok' ? '1px solid #2A6A4A' : '1px solid #6A2A2A',
-            color:           toast.type === 'ok' ? '#80E0A0' : '#FF8080',
+            backgroundColor: toast.type === 'ok' ? '#072A18' : '#2A0808',
+            border:          toast.type === 'ok' ? '1px solid #1A5A34' : '1px solid #5A1A1A',
+            color:           toast.type === 'ok' ? '#6EE7A0' : '#FCA5A5',
           }}>
+          {toast.type === 'ok'
+            ? <CheckCircle2 size={15} style={{ flexShrink: 0 }} />
+            : <XCircle      size={15} style={{ flexShrink: 0 }} />}
           {toast.msg}
         </div>
       )}
@@ -107,14 +150,198 @@ export default function OwnerPage() {
   )
 }
 
+// ── Reservas Tab ──────────────────────────────────────────────────────────────
+function ReservasTab({ showToast }: { showToast: (t: 'ok' | 'err', m: string) => void }) {
+  const [gifts,     setGifts]     = useState<GiftType[]>([])
+  const [claims,    setClaims]    = useState<Claims>({})
+  const [logs,      setLogs]      = useState<WaLog[]>([])
+  const [loading,   setLoading]   = useState(true)
+  const [removing,  setRemoving]  = useState<string | null>(null)
+  const [resending, setResending] = useState<string | null>(null)
+
+  const fetchAll = useCallback(async () => {
+    const [giftsRes, claimsRes, logsRes] = await Promise.all([
+      fetch('/api/gifts-catalog').catch(() => null),
+      fetch('/api/gifts').catch(() => null),
+      fetch('/api/owner/whatsapp?action=logs').catch(() => null),
+    ])
+    if (giftsRes?.ok)  setGifts(await giftsRes.json())
+    if (claimsRes?.ok) setClaims(await claimsRes.json())
+    if (logsRes?.ok)   setLogs(await logsRes.json())
+    setLoading(false)
+  }, [])
+
+  useEffect(() => { fetchAll() }, [fetchAll])
+
+  const logMap = logs.reduce<Record<string, WaLog>>((acc, log) => {
+    const k = `${log.gift_id}-${log.claimed_by}`
+    if (!acc[k] || log.sent_at > acc[k].sent_at) acc[k] = log
+    return acc
+  }, {})
+
+  const allClaims = gifts.flatMap(g =>
+    (claims[String(g.id)] ?? []).map(c => ({ gift: g, claim: c }))
+  )
+
+  const sentCount   = allClaims.filter(({ gift, claim }) => logMap[`${gift.id}-${claim.claimedBy}`]?.status === 'sent').length
+  const failedCount = allClaims.filter(({ gift, claim }) => logMap[`${gift.id}-${claim.claimedBy}`]?.status === 'failed').length
+
+  const handleRemove = async (giftId: number, claimedBy: string) => {
+    const key = `${giftId}-${claimedBy}`
+    setRemoving(key)
+    const res = await fetch('/api/owner/unclaim', {
+      method: 'DELETE', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ giftId, claimedBy }),
+    })
+    if (res.ok) {
+      showToast('ok', `Reserva de "${claimedBy}" removida.`)
+      setClaims(prev => ({
+        ...prev,
+        [String(giftId)]: (prev[String(giftId)] ?? []).filter(c => c.claimedBy !== claimedBy),
+      }))
+    } else {
+      showToast('err', 'Erro ao remover reserva.')
+    }
+    setRemoving(null)
+  }
+
+  const handleResend = async (giftId: number, claimedBy: string) => {
+    const key = `${giftId}-${claimedBy}`
+    setResending(key)
+    const res = await fetch('/api/owner/resend', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ giftId, claimedBy }),
+    })
+    if (res.ok) {
+      showToast('ok', `Mensagem reenviada para ${claimedBy}.`)
+      const logsRes = await fetch('/api/owner/whatsapp?action=logs').catch(() => null)
+      if (logsRes?.ok) setLogs(await logsRes.json())
+    } else {
+      const d = await res.json().catch(() => ({})) as { error?: string }
+      showToast('err', `Falha ao reenviar: ${d.error ?? 'erro desconhecido'}`)
+    }
+    setResending(null)
+  }
+
+  return (
+    <div className="flex flex-col gap-5">
+      {/* Stats */}
+      <div className="grid grid-cols-3 gap-3">
+        <StatCard label="Reservas"  value={allClaims.length} color="#4A90D9" />
+        <StatCard label="Enviados"  value={sentCount}        color="#4CAF9A" />
+        <StatCard label="Falharam"  value={failedCount}      color={failedCount > 0 ? '#F87171' : '#2A4060'} />
+      </div>
+
+      {/* Header row */}
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm font-bold" style={{ color: '#E2EEFF' }}>
+          Todas as reservas
+        </h2>
+        <button onClick={fetchAll}
+          className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg transition-opacity hover:opacity-80"
+          style={{ color: '#4A90D9', backgroundColor: '#0F2035', border: '1px solid #1E3045' }}>
+          <RefreshCw size={11} /> Atualizar
+        </button>
+      </div>
+
+      {loading ? (
+        <Skeleton rows={4} />
+      ) : allClaims.length === 0 ? (
+        <div className="rounded-2xl p-10 text-center" style={{ backgroundColor: '#162030', border: '1px solid #1E3045' }}>
+          <Users size={32} style={{ color: '#1E3045', margin: '0 auto 12px' }} />
+          <p className="text-sm font-semibold" style={{ color: '#4A6080' }}>Nenhuma reserva ainda</p>
+          <p className="text-xs mt-1" style={{ color: '#2A4060' }}>As reservas aparecem aqui assim que alguém escolher um presente.</p>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-3">
+          {allClaims.map(({ gift, claim }) => {
+            const cfg = categoryConfig[gift.category]
+            const key = `${gift.id}-${claim.claimedBy}`
+            const log = logMap[key]
+
+            const badge = log
+              ? log.status === 'sent'
+                ? { label: 'Enviado',     Icon: CheckCircle2, color: '#4CAF9A', bg: '#072A18', bd: '#1A5A34' }
+                : log.status === 'failed'
+                ? { label: 'Falhou',      Icon: XCircle,      color: '#F87171', bg: '#2A0808', bd: '#5A1A1A' }
+                : { label: 'Pendente',    Icon: Clock,        color: '#F0B429', bg: '#2A1A08', bd: '#5A3A18' }
+              : { label: 'Não enviado',   Icon: Clock,        color: '#4A6080', bg: '#0F1D2B', bd: '#1E3045' }
+
+            return (
+              <div key={key} className="rounded-2xl p-4" style={{ backgroundColor: '#162030', border: '1px solid #1E3045' }}>
+                {/* Top: name + gift + remove */}
+                <div className="flex items-start justify-between gap-3 mb-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap mb-1">
+                      <p className="text-sm font-bold" style={{ color: '#E2EEFF' }}>{claim.claimedBy}</p>
+                      <span className="text-xs px-2 py-0.5 rounded-full font-semibold"
+                        style={{ backgroundColor: cfg.bgColor + '28', color: cfg.color }}>
+                        {cfg.label}
+                      </span>
+                    </div>
+                    <p className="text-xs leading-snug mb-2" style={{ color: '#8AAAC0' }}>{gift.name}</p>
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <a href={`https://wa.me/55${claim.phone.replace(/\D/g, '')}`}
+                        target="_blank" rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-xs font-medium hover:underline"
+                        style={{ color: '#4CAF9A' }}>
+                        <Phone size={10} /> {claim.phone}
+                      </a>
+                      <span className="text-xs" style={{ color: '#2A4060' }}>{fmt(claim.claimedAt)}</span>
+                    </div>
+                  </div>
+                  <button onClick={() => handleRemove(gift.id, claim.claimedBy)} disabled={removing === key}
+                    aria-label="Remover reserva"
+                    className="w-8 h-8 flex items-center justify-center rounded-xl flex-shrink-0 transition-opacity hover:opacity-80 disabled:opacity-40"
+                    style={{ backgroundColor: '#1A0A0A', border: '1px solid #3D1515' }}>
+                    {removing === key
+                      ? <span className="w-3 h-3 rounded-full border-2 border-red-400 border-t-transparent animate-spin" />
+                      : <Trash2 size={13} style={{ color: '#F87171' }} />}
+                  </button>
+                </div>
+
+                {/* Bottom: WA status + resend */}
+                <div className="flex items-center justify-between gap-2 pt-3" style={{ borderTop: '1px solid #1A2D40' }}>
+                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg"
+                    style={{ backgroundColor: badge.bg, border: `1px solid ${badge.bd}` }}>
+                    <badge.Icon size={11} style={{ color: badge.color }} />
+                    <span className="text-xs font-semibold" style={{ color: badge.color }}>{badge.label}</span>
+                    {log && <span className="text-xs ml-1" style={{ color: badge.color, opacity: 0.55 }}>{fmt(log.sent_at)}</span>}
+                  </div>
+                  <button onClick={() => handleResend(gift.id, claim.claimedBy)} disabled={resending === key}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-opacity hover:opacity-80 disabled:opacity-50"
+                    style={{ backgroundColor: '#0A2A1A', color: '#4CAF9A', border: '1px solid #1A5A34' }}>
+                    {resending === key
+                      ? <span className="w-3 h-3 rounded-full border-2 border-green-400 border-t-transparent animate-spin" />
+                      : <Send size={11} />}
+                    {log?.status === 'sent' ? 'Reenviar' : 'Enviar'}
+                  </button>
+                </div>
+
+                {log?.status === 'failed' && log.error && (
+                  <div className="mt-2 px-3 py-2 rounded-lg flex items-start gap-2"
+                    style={{ backgroundColor: '#2A0808', border: '1px solid #5A1A1A' }}>
+                    <AlertCircle size={12} style={{ color: '#F87171', flexShrink: 0, marginTop: 1 }} />
+                    <p className="text-xs break-all" style={{ color: '#FCA5A5' }}>{log.error}</p>
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── WhatsApp Tab ──────────────────────────────────────────────────────────────
-function WhatsAppTab({ showToast }: { showToast: (t:'ok'|'err', m:string) => void }) {
-  const [status,       setStatus]       = useState<WaStatus | null>(null)
-  const [serviceDown,  setServiceDown]  = useState(false)
-  const [qr,           setQr]           = useState<string | null>(null)
-  const [logs,         setLogs]         = useState<WaLog[]>([])
-  const [loading,      setLoading]      = useState(true)
-  const [polling,      setPolling]      = useState(false)
+function WhatsAppTab({ showToast }: { showToast: (t: 'ok' | 'err', m: string) => void }) {
+  const [status,      setStatus]      = useState<WaStatus | null>(null)
+  const [serviceDown, setServiceDown] = useState(false)
+  const [qr,          setQr]          = useState<string | null>(null)
+  const [logs,        setLogs]        = useState<WaLog[]>([])
+  const [loading,     setLoading]     = useState(true)
+  const [polling,     setPolling]     = useState(false)
   const prevConnectedRef = useRef<boolean | null>(null)
 
   const fetchStatus = useCallback(async () => {
@@ -145,12 +372,9 @@ function WhatsAppTab({ showToast }: { showToast: (t:'ok'|'err', m:string) => voi
     finally { setLoading(false) }
   }, [])
 
-  // Detect disconnect: when connected transitions true → false, clear old QR immediately
   useEffect(() => {
     const connected = status?.connected ?? null
-    if (prevConnectedRef.current === true && connected === false) {
-      setQr(null)
-    }
+    if (prevConnectedRef.current === true && connected === false) setQr(null)
     prevConnectedRef.current = connected
   }, [status?.connected])
 
@@ -161,96 +385,141 @@ function WhatsAppTab({ showToast }: { showToast: (t:'ok'|'err', m:string) => voi
   }, [fetchStatus, fetchQR, fetchLogs])
 
   const handleLogout = async () => {
-    await fetch('/api/owner/whatsapp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'logout' }) })
+    await fetch('/api/owner/whatsapp', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'logout' }),
+    })
     showToast('ok', 'WhatsApp desconectado.')
     setStatus(null); setQr(null); fetchStatus()
   }
 
-  return (
-    <div className="grid lg:grid-cols-2 gap-6">
-      {/* Connection card */}
-      <div className="rounded-2xl p-5" style={{ backgroundColor: '#162030', border: '1px solid #2A3A4A' }}>
-        <h2 className="text-sm font-bold mb-4" style={{ color: '#E8F0FE' }}>Conexão WhatsApp</h2>
+  const sentCount    = logs.filter(l => l.status === 'sent').length
+  const failedCount  = logs.filter(l => l.status === 'failed').length
+  const pendingCount = logs.filter(l => l.status === 'pending').length
 
-        {/* Status pill */}
-        <div className="flex items-center gap-2 mb-4">
-          {status?.connected
-            ? <><Wifi    size={14} style={{ color: '#4CAF9A' }} /><span className="text-sm font-semibold" style={{ color: '#4CAF9A' }}>Conectado — {status.phone}</span></>
-            : <><WifiOff size={14} style={{ color: '#FF8080' }} /><span className="text-sm"               style={{ color: '#FF8080' }}>Desconectado</span></>}
+  return (
+    <div className="flex flex-col gap-5">
+      {/* Connection card */}
+      <div className="rounded-2xl p-5" style={{ backgroundColor: '#162030', border: '1px solid #1E3045' }}>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-sm font-bold" style={{ color: '#E2EEFF' }}>Conexão WhatsApp</h2>
+          {status?.connected ? (
+            <span className="flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-lg"
+              style={{ color: '#4CAF9A', backgroundColor: '#072A18', border: '1px solid #1A5A34' }}>
+              <Wifi size={11} /> Conectado
+            </span>
+          ) : (
+            <span className="flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-lg"
+              style={{ color: '#F87171', backgroundColor: '#2A0808', border: '1px solid #5A1A1A' }}>
+              <WifiOff size={11} /> Desconectado
+            </span>
+          )}
         </div>
 
-        {/* Microservice unreachable */}
-        {serviceDown && (
-          <p className="text-xs mb-4 p-3 rounded-xl" style={{ backgroundColor: '#2A1515', color: '#FF8080', border: '1px solid #5A2020' }}>
-            Microserviço inacessível. Verifique se o container Docker está rodando e se WHATSAPP_SERVICE_URL está correto na Vercel.
+        {status?.phone && (
+          <p className="text-xs mb-4" style={{ color: '#4A6080' }}>
+            Número: <span style={{ color: '#8AAAC0' }}>{status.phone}</span>
           </p>
         )}
 
-        {/* QR code */}
-        {!status?.connected && qr && (
-          <div className="text-center mb-4">
-            <p className="text-xs mb-3" style={{ color: '#8AA0B8' }}>Escaneie com seu WhatsApp</p>
-            <img src={qr} alt="QR Code WhatsApp" className="mx-auto rounded-xl"
-              style={{ width: 200, height: 200, border: '2px solid #2A3A4A' }} />
+        {serviceDown && (
+          <div className="flex items-start gap-2 mb-4 p-3 rounded-xl"
+            style={{ backgroundColor: '#2A0808', border: '1px solid #5A1A1A' }}>
+            <AlertCircle size={14} style={{ color: '#F87171', flexShrink: 0, marginTop: 1 }} />
+            <p className="text-xs leading-relaxed" style={{ color: '#FCA5A5' }}>
+              Microserviço inacessível. Verifique se o container Docker está rodando e se <code className="text-xs">WHATSAPP_SERVICE_URL</code> está correto na Vercel.
+            </p>
           </div>
         )}
 
-        {/* Waiting for QR (service online, Chromium initializing) */}
+        {!status?.connected && qr && (
+          <div className="text-center mb-4">
+            <p className="text-xs font-semibold mb-3" style={{ color: '#8AAAC0' }}>Escaneie com seu WhatsApp</p>
+            <img src={qr} alt="QR Code WhatsApp" className="mx-auto rounded-2xl"
+              style={{ width: 200, height: 200, border: '2px solid #1E3045' }} />
+            <p className="text-xs mt-3" style={{ color: '#4A6080' }}>
+              WhatsApp → Aparelhos Conectados → Conectar aparelho
+            </p>
+          </div>
+        )}
+
         {!serviceDown && !status?.connected && !qr && (
           <div className="text-center py-6">
-            <QrCode size={40} style={{ color: '#4A90D9', margin: '0 auto 12px' }} />
-            <p className="text-xs font-semibold" style={{ color: '#8AA0B8' }}>Aguardando QR code...</p>
+            <div className="w-12 h-12 rounded-2xl flex items-center justify-center mx-auto mb-3"
+              style={{ backgroundColor: '#0F2035' }}>
+              <QrCode size={22} style={{ color: '#4A90D9' }} />
+            </div>
+            <p className="text-sm font-semibold" style={{ color: '#8AAAC0' }}>Aguardando QR code...</p>
             <p className="text-xs mt-1" style={{ color: '#4A6080' }}>O Chromium pode levar até 30s para iniciar.</p>
           </div>
         )}
 
-        <div className="flex gap-2 mt-2">
+        <div className="flex gap-2 mt-4">
           <button onClick={() => { fetchStatus(); fetchQR() }} disabled={polling}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold"
-            style={{ backgroundColor: '#1E3050', color: '#4A90D9', border: '1px solid #2A4060' }}>
-            <RefreshCw size={12} className={polling ? 'animate-spin' : ''} />
-            Atualizar
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-opacity hover:opacity-80 disabled:opacity-50"
+            style={{ backgroundColor: '#0F2035', color: '#4A90D9', border: '1px solid #1E3045' }}>
+            <RefreshCw size={12} className={polling ? 'animate-spin' : ''} /> Atualizar
           </button>
           {status?.connected && (
             <button onClick={handleLogout}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold"
-              style={{ backgroundColor: '#1E1010', color: '#FF8080', border: '1px solid #5A2020' }}>
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-opacity hover:opacity-80"
+              style={{ backgroundColor: '#1A0A0A', color: '#F87171', border: '1px solid #3D1515' }}>
               <LogOut size={12} /> Desconectar
             </button>
           )}
         </div>
       </div>
 
+      {/* Message stats */}
+      <div className="grid grid-cols-3 gap-3">
+        <StatCard label="Enviadas"  value={sentCount}    color="#4CAF9A" />
+        <StatCard label="Falharam"  value={failedCount}  color={failedCount  > 0 ? '#F87171' : '#2A4060'} />
+        <StatCard label="Pendentes" value={pendingCount} color={pendingCount > 0 ? '#F0B429' : '#2A4060'} />
+      </div>
+
       {/* Logs */}
-      <div className="rounded-2xl p-5" style={{ backgroundColor: '#162030', border: '1px solid #2A3A4A' }}>
+      <div className="rounded-2xl p-5" style={{ backgroundColor: '#162030', border: '1px solid #1E3045' }}>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-sm font-bold" style={{ color: '#E8F0FE' }}>Log de Mensagens</h2>
-          <button onClick={fetchLogs} className="text-xs" style={{ color: '#4A90D9' }}>
-            <RefreshCw size={12} />
+          <h2 className="text-sm font-bold" style={{ color: '#E2EEFF' }}>Log de mensagens</h2>
+          <button onClick={fetchLogs}
+            className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg transition-opacity hover:opacity-80"
+            style={{ color: '#4A90D9', backgroundColor: '#0F2035', border: '1px solid #1E3045' }}>
+            <RefreshCw size={11} /> Atualizar
           </button>
         </div>
 
         {loading ? (
-          <p className="text-xs" style={{ color: '#8AA0B8' }}>Carregando...</p>
+          <Skeleton rows={3} />
         ) : logs.length === 0 ? (
-          <p className="text-xs" style={{ color: '#8AA0B8' }}>Nenhuma mensagem enviada ainda.</p>
+          <div className="py-8 text-center">
+            <MessageSquare size={28} style={{ color: '#1E3045', margin: '0 auto 8px' }} />
+            <p className="text-xs" style={{ color: '#4A6080' }}>Nenhuma mensagem enviada ainda.</p>
+          </div>
         ) : (
-          <div className="flex flex-col gap-2 max-h-80 overflow-y-auto">
-            {logs.map(log => (
-              <div key={log.id} className="rounded-xl p-3" style={{ backgroundColor: '#0F1923', border: '1px solid #2A3A4A' }}>
-                <div className="flex items-center gap-2 mb-1">
-                  {log.status === 'sent'
-                    ? <CheckCircle2 size={12} style={{ color: '#4CAF9A' }} />
-                    : log.status === 'failed'
-                    ? <XCircle size={12} style={{ color: '#FF8080' }} />
-                    : <Clock size={12} style={{ color: '#C9A84C' }} />}
-                  <span className="text-xs font-semibold" style={{ color: '#E8F0FE' }}>{log.claimed_by}</span>
-                  <span className="text-xs ml-auto" style={{ color: '#8AA0B8' }}>{fmt(log.sent_at)}</span>
+          <div className="flex flex-col gap-2 max-h-96 overflow-y-auto">
+            {logs.map(log => {
+              const icon = log.status === 'sent'
+                ? <CheckCircle2 size={12} style={{ color: '#4CAF9A', flexShrink: 0 }} />
+                : log.status === 'failed'
+                ? <XCircle size={12} style={{ color: '#F87171', flexShrink: 0 }} />
+                : <Clock   size={12} style={{ color: '#F0B429', flexShrink: 0 }} />
+              return (
+                <div key={log.id} className="rounded-xl p-3 flex items-start gap-2.5"
+                  style={{ backgroundColor: '#0A1520', border: '1px solid #1E3045' }}>
+                  <div className="mt-0.5">{icon}</div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-xs font-semibold" style={{ color: '#E2EEFF' }}>{log.claimed_by}</p>
+                      <p className="text-xs flex-shrink-0" style={{ color: '#2A4060' }}>{fmt(log.sent_at)}</p>
+                    </div>
+                    <p className="text-xs mt-0.5" style={{ color: '#4A6080' }}>{log.phone}</p>
+                    {log.error && (
+                      <p className="text-xs mt-1 break-all" style={{ color: '#F87171' }}>{log.error}</p>
+                    )}
+                  </div>
                 </div>
-                <p className="text-xs" style={{ color: '#8AA0B8' }}>{log.phone}</p>
-                {log.error && <p className="text-xs mt-1" style={{ color: '#FF8080' }}>{log.error}</p>}
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </div>
@@ -258,209 +527,115 @@ function WhatsAppTab({ showToast }: { showToast: (t:'ok'|'err', m:string) => voi
   )
 }
 
-// ── Reservas Tab ──────────────────────────────────────────────────────────────
-function ReservasTab({ showToast }: { showToast: (t:'ok'|'err', m:string) => void }) {
-  const [claims,   setClaims]   = useState<Claims>({})
-  const [logs,     setLogs]     = useState<WaLog[]>([])
-  const [loading,  setLoading]  = useState(true)
-  const [removing, setRemoving] = useState<string | null>(null)
-  const [resending, setResending] = useState<string | null>(null)
+// ── Presentes Tab ─────────────────────────────────────────────────────────────
+function PresentesTab({ showToast }: { showToast: (t: 'ok' | 'err', m: string) => void }) {
+  void showToast
+  const [gifts,   setGifts]   = useState<GiftType[]>([])
+  const [claims,  setClaims]  = useState<Claims>({})
+  const [loading, setLoading] = useState(true)
 
-  const fetchAll = useCallback(async () => {
-    const [claimsRes, logsRes] = await Promise.all([
-      fetch('/api/gifts').catch(() => null),
-      fetch('/api/owner/whatsapp?action=logs').catch(() => null),
-    ])
-    if (claimsRes?.ok) setClaims(await claimsRes.json())
-    if (logsRes?.ok)   setLogs(await logsRes.json())
-    setLoading(false)
+  useEffect(() => {
+    Promise.all([
+      fetch('/api/gifts-catalog').then(r => r.ok ? r.json() : []),
+      fetch('/api/gifts').then(r => r.ok ? r.json() : {}),
+    ]).then(([g, c]) => { setGifts(g); setClaims(c) })
+      .finally(() => setLoading(false))
   }, [])
 
-  useEffect(() => { fetchAll() }, [fetchAll])
+  if (loading) return <Skeleton rows={6} />
 
-  // Latest log per claim: key = `${gift_id}-${claimed_by}`
-  const logMap = logs.reduce<Record<string, WaLog>>((acc, log) => {
-    const k = `${log.gift_id}-${log.claimed_by}`
-    if (!acc[k] || log.sent_at > acc[k].sent_at) acc[k] = log
-    return acc
-  }, {})
-
-  const handleRemove = async (giftId: number, claimedBy: string) => {
-    const key = `${giftId}-${claimedBy}`
-    setRemoving(key)
-    const res = await fetch('/api/owner/unclaim', {
-      method: 'DELETE', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ giftId, claimedBy }),
-    })
-    if (res.ok) {
-      showToast('ok', `Reserva de "${claimedBy}" removida.`)
-      setClaims(prev => ({ ...prev, [String(giftId)]: (prev[String(giftId)] ?? []).filter(c => c.claimedBy !== claimedBy) }))
-    } else {
-      showToast('err', 'Erro ao remover reserva.')
-    }
-    setRemoving(null)
-  }
-
-  const handleResend = async (giftId: number, claimedBy: string) => {
-    const key = `${giftId}-${claimedBy}`
-    setResending(key)
-    const res = await fetch('/api/owner/resend', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ giftId, claimedBy }),
-    })
-    if (res.ok) {
-      showToast('ok', `Mensagem reenviada para ${claimedBy}.`)
-      // Refresh logs to show updated status
-      const logsRes = await fetch('/api/owner/whatsapp?action=logs').catch(() => null)
-      if (logsRes?.ok) setLogs(await logsRes.json())
-    } else {
-      const d = await res.json().catch(() => ({})) as { error?: string }
-      showToast('err', `Falha ao reenviar: ${d.error ?? 'erro desconhecido'}`)
-    }
-    setResending(null)
-  }
-
-  const allClaims = staticGifts.flatMap(g =>
-    (claims[String(g.id)] ?? []).map(c => ({ gift: g, claim: c }))
-  )
+  const regularGifts = gifts.filter(g => g.category !== 'pix')
+  const pixGifts     = gifts.filter(g => g.category === 'pix')
+  const totalClaims  = regularGifts.reduce((s, g) => s + (claims[String(g.id)]?.length ?? 0), 0)
+  const totalSlots   = regularGifts.reduce((s, g) => s + (g.limit ?? 0), 0)
+  const pixCount     = pixGifts.reduce((s, g) => s + (claims[String(g.id)]?.length ?? 0), 0)
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-sm font-bold" style={{ color: '#E8F0FE' }}>
-          {allClaims.length} reserva{allClaims.length !== 1 ? 's' : ''}
-        </h2>
-        <button onClick={fetchAll} className="flex items-center gap-1 text-xs" style={{ color: '#4A90D9' }}>
-          <RefreshCw size={12} /> Atualizar
-        </button>
+    <div className="flex flex-col gap-5">
+      {/* Stats */}
+      <div className="grid grid-cols-3 gap-3">
+        <StatCard label="Presentes"  value={regularGifts.length} color="#4A90D9" />
+        <StatCard label="Reservados" value={totalClaims}         color="#4CAF9A" sub={`de ${totalSlots}`} />
+        <StatCard label="Pix"        value={pixCount}            color="#F0B429" />
       </div>
 
-      {loading ? (
-        <p className="text-xs" style={{ color: '#8AA0B8' }}>Carregando...</p>
-      ) : allClaims.length === 0 ? (
-        <p className="text-xs" style={{ color: '#8AA0B8' }}>Nenhuma reserva ainda.</p>
-      ) : (
-        <div className="grid gap-3">
-          {allClaims.map(({ gift, claim }) => {
-            const cfg = categoryConfig[gift.category]
-            const key = `${gift.id}-${claim.claimedBy}`
-            const log = logMap[key]
-
-            const statusBadge = log
-              ? log.status === 'sent'
-                ? { label: 'Enviado',  color: '#4CAF9A', bg: '#0D2820' }
-                : log.status === 'failed'
-                ? { label: 'Falhou',   color: '#FF6B6B', bg: '#2A1010' }
-                : { label: 'Pendente', color: '#F0B429', bg: '#2A2010' }
-              : { label: 'Não enviado', color: '#6A8098', bg: '#1A2530' }
-
-            const canResend = !log || log.status !== 'sent'
-
-            return (
-              <div key={key} className="rounded-2xl p-4"
-                style={{ backgroundColor: '#162030', border: '1px solid #2A3A4A' }}>
-                {/* Top row */}
-                <div className="flex items-start gap-3 mb-3">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold" style={{ color: '#E8F0FE' }}>{claim.claimedBy}</p>
-                    <p className="text-xs mt-0.5" style={{ color: cfg.color }}>{gift.name}</p>
-                    <a href={`https://wa.me/55${claim.phone.replace(/\D/g,'')}`} target="_blank" rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 text-xs mt-1 hover:underline" style={{ color: '#4CAF9A' }}>
-                      <Phone size={10} /> {claim.phone}
-                    </a>
-                    <p className="text-xs mt-0.5" style={{ color: '#4A6080' }}>{fmt(claim.claimedAt)}</p>
+      {/* Regular gifts */}
+      <div className="rounded-2xl overflow-hidden" style={{ border: '1px solid #1E3045' }}>
+        <div className="px-4 py-3" style={{ backgroundColor: '#0F2035', borderBottom: '1px solid #1E3045' }}>
+          <p className="text-xs font-bold uppercase tracking-widest" style={{ color: '#4A6080' }}>Presentes</p>
+        </div>
+        {regularGifts.map((g, i) => {
+          const cfg    = categoryConfig[g.category]
+          const count  = claims[String(g.id)]?.length ?? 0
+          const limit  = g.limit ?? 0
+          const pct    = limit > 0 ? count / limit : 0
+          const isFull = limit > 0 && count >= limit
+          return (
+            <div key={g.id} className="px-4 py-3 flex items-center gap-3"
+              style={{
+                backgroundColor: '#162030',
+                borderBottom: i < regularGifts.length - 1 ? '1px solid #1A2D40' : undefined,
+              }}>
+              <span className="text-xs px-2 py-0.5 rounded-full font-semibold flex-shrink-0 hidden sm:inline-block"
+                style={{ backgroundColor: cfg.bgColor + '28', color: cfg.color }}>
+                {cfg.label}
+              </span>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm leading-tight" style={{ color: '#E2EEFF' }}>{g.name}</p>
+                {g.brand && <p className="text-xs mt-0.5" style={{ color: '#4A6080' }}>{g.brand}</p>}
+              </div>
+              <div className="flex items-center gap-2.5 flex-shrink-0">
+                {limit > 0 && (
+                  <div className="w-14 h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: '#0A1520' }}>
+                    <div className="h-full rounded-full"
+                      style={{
+                        width: `${Math.min(pct * 100, 100)}%`,
+                        backgroundColor: isFull ? '#F87171' : pct >= 0.5 ? '#F0B429' : '#4CAF9A',
+                      }} />
                   </div>
-                  <button onClick={() => handleRemove(gift.id, claim.claimedBy)} disabled={removing === key}
-                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold flex-shrink-0"
-                    style={{ backgroundColor: '#1E1010', color: '#FF8080', border: '1px solid #5A2020' }}>
-                    {removing === key
-                      ? <span className="w-3 h-3 rounded-full border-2 border-red-400 border-t-transparent animate-spin" />
-                      : <Trash2 size={12} />}
-                  </button>
-                </div>
-
-                {/* WhatsApp status row */}
-                <div className="flex items-center justify-between gap-2 pt-2.5"
-                  style={{ borderTop: '1px solid #1E2D3D' }}>
-                  <div className="flex items-center gap-2">
-                    <MessageSquare size={11} style={{ color: statusBadge.color }} />
-                    <span
-                      className="text-xs font-semibold px-2 py-0.5 rounded-full"
-                      style={{ color: statusBadge.color, backgroundColor: statusBadge.bg }}
-                    >
-                      {statusBadge.label}
-                    </span>
-                    {log && (
-                      <span className="text-xs" style={{ color: '#4A6080' }}>
-                        {fmt(log.sent_at)}
-                      </span>
-                    )}
-                  </div>
-                  <button
-                    onClick={() => handleResend(gift.id, claim.claimedBy)}
-                    disabled={resending === key}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-opacity disabled:opacity-50"
-                    style={{
-                      backgroundColor: canResend ? '#0D2A1E' : '#0D2010',
-                      color:           canResend ? '#4CAF9A' : '#2D7A5A',
-                      border:          `1px solid ${canResend ? '#1A4A30' : '#1A3A28'}`,
-                    }}
-                  >
-                    {resending === key
-                      ? <span className="w-3 h-3 rounded-full border-2 border-green-400 border-t-transparent animate-spin" />
-                      : <Send size={11} />}
-                    {log?.status === 'sent' ? 'Reenviar' : 'Enviar'}
-                  </button>
-                </div>
-
-                {/* Error detail */}
-                {log?.status === 'failed' && log.error && (
-                  <p className="text-xs mt-2 px-2 py-1.5 rounded-lg break-all"
-                    style={{ backgroundColor: '#2A1010', color: '#FF8080' }}>
-                    {log.error}
-                  </p>
                 )}
+                <span className="text-xs font-mono font-semibold w-8 text-right"
+                  style={{ color: isFull ? '#F87171' : '#8AAAC0' }}>
+                  {limit === 0 ? '∞' : `${count}/${limit}`}
+                </span>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Pix */}
+      {pixGifts.length > 0 && (
+        <div className="rounded-2xl overflow-hidden" style={{ border: '1px solid #1E3045' }}>
+          <div className="px-4 py-3" style={{ backgroundColor: '#0F2035', borderBottom: '1px solid #1E3045' }}>
+            <p className="text-xs font-bold uppercase tracking-widest" style={{ color: '#4A6080' }}>Pix</p>
+          </div>
+          {pixGifts.map((g, i) => {
+            const count = claims[String(g.id)]?.length ?? 0
+            return (
+              <div key={g.id} className="px-4 py-3 flex items-center justify-between gap-3"
+                style={{
+                  backgroundColor: '#162030',
+                  borderBottom: i < pixGifts.length - 1 ? '1px solid #1A2D40' : undefined,
+                }}>
+                <p className="text-sm" style={{ color: '#E2EEFF' }}>{g.name}</p>
+                <span className="text-sm font-bold flex-shrink-0" style={{ color: '#F0B429' }}>
+                  {count} {count === 1 ? 'contribuição' : 'contribuições'}
+                </span>
               </div>
             )
           })}
         </div>
       )}
-    </div>
-  )
-}
 
-// ── Presentes Tab ─────────────────────────────────────────────────────────────
-function PresentesTab({ showToast }: { showToast: (t:'ok'|'err', m:string) => void }) {
-  // Uses static gifts — future: migrate to Supabase for full CRUD
-  void showToast
-  return (
-    <div>
-      <p className="text-xs mb-4" style={{ color: '#8AA0B8' }}>
-        Os presentes são carregados da tabela <code style={{ color: '#4A90D9' }}>gifts</code> no Supabase. Para editar, acesse o banco de dados diretamente.
+      <p className="text-xs" style={{ color: '#2A4060' }}>
+        Para editar presentes, acesse a tabela <code style={{ color: '#4A90D9' }}>gifts</code> no Supabase.
       </p>
-      <div className="grid gap-2">
-        {staticGifts.map(g => {
-          const cfg = categoryConfig[g.category]
-          return (
-            <div key={g.id} className="rounded-xl px-4 py-3 flex items-center gap-3"
-              style={{ backgroundColor: '#162030', border: '1px solid #2A3A4A' }}>
-              <span className="text-xs px-2 py-0.5 rounded-full font-semibold"
-                style={{ backgroundColor: cfg.bgColor + '33', color: cfg.color }}>
-                {cfg.label}
-              </span>
-              <span className="text-sm flex-1" style={{ color: '#E8F0FE' }}>{g.name}</span>
-              {g.brand && <span className="text-xs" style={{ color: '#4A6080' }}>{g.brand}</span>}
-              <span className="text-xs" style={{ color: '#4A6080' }}>
-                {g.limit === null ? 'Ilimitado' : `Limite: ${g.limit}`}
-              </span>
-            </div>
-          )
-        })}
-      </div>
     </div>
   )
 }
 
+// ── Config Tab ────────────────────────────────────────────────────────────────
 const DEFAULT_WA_TEMPLATE = `🎊 *{name}, sua reserva está confirmada!* ✅
 
 Que alegria contar com sua presença na celebração dos *80 anos de Antônia Lucena*! 🎂
@@ -478,8 +653,37 @@ Que alegria contar com sua presença na celebração dos *80 anos de Antônia Lu
 
 Te esperamos com muito carinho! 💛`
 
-// ── Config Tab ────────────────────────────────────────────────────────────────
-function ConfigTab({ showToast }: { showToast: (t:'ok'|'err', m:string) => void }) {
+function InputField({ label, value, onChange, placeholder, multiline, rows = 3 }: {
+  label: string; value: string; onChange: (v: string) => void
+  placeholder: string; multiline?: boolean; rows?: number
+}) {
+  const base = {
+    backgroundColor: '#0A1520',
+    border: '1px solid #1E3045',
+    color: '#E2EEFF',
+    outline: 'none',
+  }
+  return (
+    <div>
+      {label && (
+        <label className="block text-xs font-semibold mb-1.5" style={{ color: '#8AAAC0' }}>{label}</label>
+      )}
+      {multiline ? (
+        <textarea rows={rows} value={value} onChange={e => onChange(e.target.value)}
+          placeholder={placeholder}
+          className="w-full px-3 py-2.5 rounded-xl text-sm font-mono resize-vertical"
+          style={{ ...base, lineHeight: 1.6 }} />
+      ) : (
+        <input type="text" value={value} onChange={e => onChange(e.target.value)}
+          placeholder={placeholder}
+          className="w-full px-3 py-2.5 rounded-xl text-sm"
+          style={base} />
+      )}
+    </div>
+  )
+}
+
+function ConfigTab({ showToast }: { showToast: (t: 'ok' | 'err', m: string) => void }) {
   const [settings, setSettings] = useState<AppSettings>({})
   const [loading,  setLoading]  = useState(true)
   const [saving,   setSaving]   = useState(false)
@@ -491,6 +695,7 @@ function ConfigTab({ showToast }: { showToast: (t:'ok'|'err', m:string) => void 
   }, [])
 
   const set = (key: string, value: string) => setSettings(prev => ({ ...prev, [key]: value }))
+  const get = (key: string) => settings[key] ?? ''
 
   const handleSave = async () => {
     setSaving(true)
@@ -499,77 +704,67 @@ function ConfigTab({ showToast }: { showToast: (t:'ok'|'err', m:string) => void 
       body: JSON.stringify(settings),
     })
     if (res.ok) showToast('ok', 'Configurações salvas.')
-    else showToast('err', 'Erro ao salvar.')
+    else        showToast('err', 'Erro ao salvar.')
     setSaving(false)
   }
 
-  const fields: { key: string; label: string; placeholder: string; multiline?: boolean; section?: string }[] = [
-    { key: 'pix_key',           label: 'Chave Pix',                          placeholder: 'ex: (85) 99999-9999, CPF ou email', section: 'Configurações Pix' },
-    { key: 'pix_owner_name',    label: 'Nome do titular da chave',           placeholder: 'ex: Antônia Lucena' },
-    { key: 'pix_receipt_phone', label: 'Telefone para receber comprovante',  placeholder: 'ex: (85) 98765-4321' },
-    { key: 'event_date',        label: 'Data do evento',                     placeholder: '16 de Agosto de 2026', section: 'Evento' },
-    { key: 'event_time',        label: 'Horário',                            placeholder: '18h30' },
-    { key: 'event_place',       label: 'Local',                              placeholder: 'Buffet Diferentes Sabores' },
-    { key: 'rsvp_deadline',     label: 'Prazo de confirmação',               placeholder: '20 de julho de 2026' },
-    { key: 'whatsapp_template', label: 'Template da mensagem WhatsApp',
-      placeholder: '🎊 *{name}, sua reserva está confirmada!* ✅\n\n🎁 *Presente:* {gift}\n\n📅 {date} · ⏰ {time}\n📍 {place}\n\n💛', multiline: true, section: 'WhatsApp' },
-  ]
-
-  if (loading) return <p className="text-xs" style={{ color: '#8AA0B8' }}>Carregando...</p>
+  if (loading) return <Skeleton rows={4} />
 
   return (
-    <div>
-      <p className="text-xs mb-5" style={{ color: '#8AA0B8' }}>
-        Variáveis disponíveis no template: <code style={{ color: '#4A90D9' }}>{'{name}'}</code>, <code style={{ color: '#4A90D9' }}>{'{gift}'}</code>, <code style={{ color: '#4A90D9' }}>{'{date}'}</code>, <code style={{ color: '#4A90D9' }}>{'{time}'}</code>, <code style={{ color: '#4A90D9' }}>{'{place}'}</code>, <code style={{ color: '#4A90D9' }}>{'{pix_key}'}</code>, <code style={{ color: '#4A90D9' }}>{'{pix_owner}'}</code>, <code style={{ color: '#4A90D9' }}>{'{pix_receipt}'}</code>
-      </p>
+    <div className="flex flex-col gap-5">
+      {/* PIX */}
+      <div className="rounded-2xl p-5" style={{ backgroundColor: '#162030', border: '1px solid #1E3045' }}>
+        <SectionDivider title="Pix" />
+        <div className="flex flex-col gap-4">
+          <InputField label="Chave Pix"               value={get('pix_key')}           onChange={v => set('pix_key', v)}           placeholder="(85) 99999-9999, CPF ou e-mail" />
+          <InputField label="Nome do titular"         value={get('pix_owner_name')}    onChange={v => set('pix_owner_name', v)}    placeholder="Antônia Lucena" />
+          <InputField label="Telefone p/ comprovante" value={get('pix_receipt_phone')} onChange={v => set('pix_receipt_phone', v)} placeholder="(85) 98765-4321" />
+        </div>
+      </div>
 
-      <div className="grid gap-4 mb-6">
-        {fields.map(({ key, label, placeholder, multiline, section }) => (
-          <div key={key}>
-            {section && (
-              <p className="text-xs font-bold uppercase tracking-widest mb-3 mt-2 pt-2" style={{ color: '#4A90D9', borderTop: '1px solid #2A3A4A' }}>
-                {section}
-              </p>
-            )}
-            <div className="flex items-center justify-between mb-1.5">
-              <label className="text-xs font-semibold" style={{ color: '#C0D0E0' }}>{label}</label>
-              {key === 'whatsapp_template' && (
-                <button
-                  type="button"
-                  onClick={() => set('whatsapp_template', DEFAULT_WA_TEMPLATE)}
-                  className="text-xs px-2 py-0.5 rounded-lg transition-opacity hover:opacity-80"
-                  style={{ color: '#4A90D9', border: '1px solid #2A3A4A', backgroundColor: '#0F1923' }}
-                >
-                  ↺ Restaurar padrão
-                </button>
-              )}
-            </div>
-            {multiline ? (
-              <textarea rows={key === 'whatsapp_template' ? 12 : 3} value={settings[key] ?? ''} onChange={e => set(key, e.target.value)}
-                placeholder={placeholder}
-                className="w-full px-3 py-2 rounded-xl text-sm outline-none font-mono"
-                style={{ backgroundColor: '#0F1923', border: '1px solid #2A3A4A', color: '#E8F0FE', resize: 'vertical' }}
-              />
-            ) : (
-              <input type="text" value={settings[key] ?? ''} onChange={e => set(key, e.target.value)}
-                placeholder={placeholder}
-                className="w-full px-3 py-2 rounded-xl text-sm outline-none"
-                style={{ backgroundColor: '#0F1923', border: '1px solid #2A3A4A', color: '#E8F0FE' }}
-              />
-            )}
+      {/* Evento */}
+      <div className="rounded-2xl p-5" style={{ backgroundColor: '#162030', border: '1px solid #1E3045' }}>
+        <SectionDivider title="Evento" />
+        <div className="grid sm:grid-cols-2 gap-4">
+          <InputField label="Data"              value={get('event_date')}    onChange={v => set('event_date', v)}    placeholder="16 de Agosto de 2026" />
+          <InputField label="Horário"           value={get('event_time')}    onChange={v => set('event_time', v)}    placeholder="18h30" />
+          <InputField label="Prazo confirmação" value={get('rsvp_deadline')} onChange={v => set('rsvp_deadline', v)} placeholder="20 de julho de 2026" />
+          <div className="sm:col-span-2">
+            <InputField label="Local" value={get('event_place')} onChange={v => set('event_place', v)} placeholder="Buffet Diferentes Sabores" />
           </div>
-        ))}
+        </div>
       </div>
 
-      <div className="flex items-center gap-3">
-        <button onClick={handleSave} disabled={saving}
-          className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold text-white transition-all disabled:opacity-50"
-          style={{ background: 'linear-gradient(135deg, #4A90D9, #357ABD)' }}>
-          {saving
-            ? <><span className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" /> Salvando...</>
-            : <><Save size={14} /> Salvar configurações</>}
-        </button>
+      {/* WhatsApp template */}
+      <div className="rounded-2xl p-5" style={{ backgroundColor: '#162030', border: '1px solid #1E3045' }}>
+        <SectionDivider title="Template WhatsApp"
+          action={
+            <button type="button" onClick={() => set('whatsapp_template', DEFAULT_WA_TEMPLATE)}
+              className="text-xs px-2.5 py-1 rounded-lg transition-opacity hover:opacity-80 flex-shrink-0"
+              style={{ color: '#4A90D9', border: '1px solid #1E3045', backgroundColor: '#0A1520' }}>
+              ↺ Restaurar
+            </button>
+          }
+        />
+        <p className="text-xs mb-4" style={{ color: '#4A6080' }}>
+          Variáveis disponíveis:{' '}
+          {['{name}', '{gift}', '{date}', '{time}', '{place}', '{pix_key}', '{pix_owner}', '{pix_receipt}'].map(v => (
+            <code key={v} className="text-xs mx-0.5 px-1 py-0.5 rounded"
+              style={{ backgroundColor: '#0A1520', color: '#8AAAC0' }}>{v}</code>
+          ))}
+        </p>
+        <InputField label="" value={get('whatsapp_template')} onChange={v => set('whatsapp_template', v)}
+          placeholder="Template da mensagem..." multiline rows={12} />
       </div>
+
+      {/* Save */}
+      <button onClick={handleSave} disabled={saving}
+        className="flex items-center justify-center gap-2 w-full py-3.5 rounded-2xl text-sm font-bold text-white transition-all disabled:opacity-50"
+        style={{ background: 'linear-gradient(135deg, #2563EB, #1D4ED8)' }}>
+        {saving
+          ? <><span className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" /> Salvando...</>
+          : <><Save size={14} /> Salvar configurações</>}
+      </button>
     </div>
   )
 }
