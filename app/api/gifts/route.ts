@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { waitUntil } from '@vercel/functions'
 import { getGifts } from '@/lib/gifts-db'
 import { readClaims, countClaims, insertClaim, deleteClaim } from '@/lib/claims'
 import { createClient } from '@supabase/supabase-js'
@@ -53,9 +54,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Erro interno' }, { status: 500 })
   }
 
-  // Send WhatsApp confirmation (fire-and-forget — never blocks the response)
-  sendWhatsApp({ giftId, giftName: gift.name, isPix: gift.category === 'pix', claimedBy, phone }).catch(
-    err => console.error('[WA] send failed:', err)
+  // Keep the Vercel function alive until WhatsApp send completes (without blocking the response)
+  waitUntil(
+    sendWhatsApp({ giftId, giftName: gift.name, isPix: gift.category === 'pix', claimedBy, phone }).catch(
+      err => console.error('[WA] send failed:', err)
+    )
   )
 
   return NextResponse.json({ success: true }, { status: 201 })
