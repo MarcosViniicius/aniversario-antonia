@@ -187,7 +187,15 @@ app.post('/send', async (req, res) => {
     res.json({ success: true, to: numberId._serialized })
   } catch (err) {
     console.error('[WA] Send error:', err.message)
-    if (err.message.includes('timeout')) {
+    const browserDead =
+      err.message.includes('timeout') ||
+      err.message.includes('detached Frame') ||
+      err.message.includes('Session closed') ||
+      err.message.includes('Target closed') ||
+      err.message.includes('Connection is closed') ||
+      err.message.includes('context was destroyed') ||
+      err.message.includes('Protocol error')
+    if (browserDead) {
       console.warn('[WA] Browser em estado inválido — reiniciando sessão')
       restartClient(1_000)
     }
