@@ -34,11 +34,59 @@ app.use((req, res, next) => {
 })
 
 // ── WhatsApp client state ─────────────────────────────────────────────────────
-let waClient      = null
-let qrDataURL     = null
-let isReady       = false
+let waClient       = null
+let qrDataURL      = null
+let isReady        = false
 let connectedPhone = null
-let isRestarting  = false
+let isRestarting   = false
+let watchdogTimer  = null
+
+// Helper: adds a timeout to any promise
+function withTimeout(promise, ms, label) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error(`${label} timeout after ${ms}ms`)), ms)
+    ),
+  ])
+}
+
+// Returns true if the error is a Puppeteer/browser-level failure
+function isBrowserError(msg) {
+  return (
+    msg.includes('timeout') ||
+    msg.includes('detached Frame') ||
+    msg.includes('Session closed') ||
+    msg.includes('Target closed') ||
+    msg.includes('Connection is closed') ||
+    msg.includes('context was destroyed') ||
+    msg.includes('Protocol error') ||
+    msg.includes('Page crashed') ||
+    msg.includes('Cannot read properties of null')
+  )
+}
+
+function stopWatchdog() {
+  if (watchdogTimer) { clearInterval(watchdogTimer); watchdogTimer = null }
+}
+
+function startWatchdog() {
+  stopWatchdog()
+  watchdogTimer = setInterval(async () => {
+    if (!isReady || !waClient || isRestarting) return
+    const page = waClient.pupPage
+    if (!page) {
+      console.warn('[WA] Watchdog: pupPage is null — restarting')
+      return restartClient(2_000)
+    }
+    try {
+      await withTimeout(page.evaluate(() => true), 8_000, 'watchdog')
+    } catch (err) {
+      console.error('[WA] Watchdog detected dead page:', err.message, '— restarting')
+      restartClient(3_000)
+    }
+  }, 60_000) // check every 60s
+}
 
 async function restartClient(delayMs = 5_000) {
   if (isRestarting) return
@@ -46,6 +94,7 @@ async function restartClient(delayMs = 5_000) {
   isReady        = false
   connectedPhone = null
   qrDataURL      = null
+  stopWatchdog()
 
   const old = waClient
   waClient = null
@@ -108,15 +157,11 @@ function buildClient() {
       isReady = true
       return
     }
-    Promise.race([
-      page.evaluate(() => true),
-      new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('CDP validation timeout')), 8_000)
-      ),
-    ])
+    withTimeout(page.evaluate(() => true), 8_000, 'CDP validation')
       .then(() => {
         isReady = true
         console.log('[WA] CDP validated — ready to send')
+        startWatchdog()
       })
       .catch(err => {
         console.error('[WA] CDP validation failed:', err.message, '— restarting in 3s')
@@ -173,29 +218,23 @@ app.post('/send', async (req, res) => {
   try {
     // Resolve o LID do contato (sistema novo do WhatsApp, a partir de 2024).
     // Sem isso, sendMessage lança "No LID for user".
-    const numberId = await waClient.getNumberId(normalized)
+    const numberId = await withTimeout(
+      waClient.getNumberId(normalized), 12_000, 'getNumberId'
+    )
     if (!numberId) {
       console.warn('[WA] Número não encontrado no WhatsApp:', normalized)
       return res.status(400).json({ error: `Número ${normalized} não encontrado no WhatsApp` })
     }
 
-    const sendTimeout = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('sendMessage timeout')), 20_000)
+    await withTimeout(
+      waClient.sendMessage(numberId._serialized, message), 20_000, 'sendMessage'
     )
-    await Promise.race([waClient.sendMessage(numberId._serialized, message), sendTimeout])
     console.log('[WA] Sent to', numberId._serialized)
     res.json({ success: true, to: numberId._serialized })
   } catch (err) {
     console.error('[WA] Send error:', err.message)
-    const browserDead =
-      err.message.includes('timeout') ||
-      err.message.includes('detached Frame') ||
-      err.message.includes('Session closed') ||
-      err.message.includes('Target closed') ||
-      err.message.includes('Connection is closed') ||
-      err.message.includes('context was destroyed') ||
-      err.message.includes('Protocol error')
-    if (browserDead) {
+    if (isBrowserError(err.message)) {
+      isReady = false // marca imediatamente — não aceita novas mensagens enquanto reinicia
       console.warn('[WA] Browser em estado inválido — reiniciando sessão')
       restartClient(1_000)
     }
